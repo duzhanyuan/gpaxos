@@ -1,0 +1,13 @@
+syntax = "proto2";
+package common;
+
+message AcceptorStateData
+{
+  required uint64 InstanceID = 1;
+  required uint64 PromiseID = 2;
+  required uint64 PromiseNodeID = 3;
+  required uint64 AcceptedID = 4;
+  required uint64 AcceptedNodeID = 5;
+  required bytes AcceptedValue = 6;
+  required uint32 Checksum = 7;
+};
