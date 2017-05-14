@@ -276,6 +276,10 @@ func (self *LogStore) OpenFile(fileId int32) (*os.File, error) {
 	return os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 }
 
+func (self *LogStore) Append(options WriteOptions, instanceId uint64, value string, fileId *string) error {
+	return nil
+}
+
 func (self *LogStore) EncodeFileId(fileId int32, offset uint64, cksum uint32, fileIdStr *string) {
 	buffer := make([]byte, util.INT32SIZE+util.UINT64SIZE+util.UINT32SIZE)
 	util.EncodeInt32(buffer, 0, fileId)
