@@ -33,6 +33,8 @@ func (as *AcceptorState) Persist(instanceid common.InstanceId, lastCheckSum uint
 		AcceptedValue: as.AcceptValue,
 		Checksum: as.CheckSum
 	}
+
+	
 }
 
 func NewAcceptorState() {
