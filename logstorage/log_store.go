@@ -28,7 +28,7 @@ func (self *fileLogger) Log(fmt string, args ...interface{}) {
 }
 
 type LogStore struct {
-	MyGroupIdx    int
+	MyGroupIdx    int32
 	Path          string
 	FileLogger    fileLogger
 	MetaFile      *os.File
@@ -148,6 +148,67 @@ func (self *LogStore) RebuildIndex(db *Database, nowOffset *uint64) error {
 
 		nowFileId++
 	}
+	return nil
+}
+
+func (self *LogStore) ReadData(fileId int32, offset uint64, cksum uint32, buffer *string) error {
+}
+
+func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *string) error {
+	var fileId int32
+	var offset uint64
+	var cksum uint32
+	self.DecodeFileId(fileIdstr, &fileId, &offset, &cksum)
+
+	file, err := self.OpenFile(fileId)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Seek(offset, os.SEEK_SET)
+	if err != nil {
+		return err
+	}
+
+	tmpbuf := make([]byte, util.INT32SIZE)
+	n, err := file.Read(tmpbuf)
+	if err != nil {
+		return err
+	}
+	if n != util.INT32SIZE {
+
+	}
+
+	len, err := strconv.Atoi(string(tmpbuf))
+	if err != nil {
+		return err
+	}
+
+	tmpbuf = make([]byte, len)
+	n, err = file.Read(tmpbuf)
+	if err != nil {
+		return err
+	}
+
+	if n != len {
+		return fmt.Errorf("read len %d not equal to %d", n, len)
+	}
+
+	fileCkSum := util.Crc32(0, tmpbuf, common.CRC32_SKIP)
+	if fileCkSum != cksum {
+		return fmt.Errorf("cksum not equal, file cksum %d, cksum %d", fileCkSum, cksum)
+	}
+
+	err = util.DecodeUint64(tmpbuf, 0, instanceId)
+	if err != nil {
+		return err
+	}
+
+	buffer = string(tmpbuf[util.UINT64SIZE:])
+
+	log.Info("ok, fileid %d offset %d instanceid %d buffser size %d",
+		fileId, offset, *instanceId, len(buffer))
+
 	return nil
 }
 

@@ -7,8 +7,16 @@ import (
 	leveldb "github.com/syndtr/goleveldb/leveldb"
 	opt "github.com/syndtr/goleveldb/leveldb/opt"
 
+	"math"
+
+	"strconv"
+
 	"github.com/lichuang/gpaxos/log"
 )
+
+const MINCHOSEN_KEY = math.MaxUint64
+const SYSTEMVARIABLES_KEY = math.MaxUint64 - 1
+const MASTERVARIABLES_KEY = math.MaxUint64 - 2
 
 type WriteOptions struct {
 }
@@ -56,14 +64,52 @@ func (self *Database) Init(dbPath string, groupId int) error {
 }
 
 func (self *Database) GetMaxInstanceIDFileID(fileId *string, instanceId *uint64) error {
+	var maxInstanceId uint64
+
+	key := self.GenKey(maxInstanceId)
+	value, err := self.leveldb.Get([]byte(key), &opt.ReadOptions{})
+	if err != nil {
+		return err
+	}
+
+	*fileId = string(value)
+	*instanceId = maxInstanceId
+
 	return nil
+}
+
+func (self *Database) GetMaxInstanceID(instanceId *uint64) error {
+	*instanceId = MINCHOSEN_KEY
+	iter := self.leveldb.NewIterator(nil, &opt.ReadOptions{})
+
+	iter.Last()
+
+	for {
+		if !iter.Valid() {
+			break
+		}
+
+		*instanceId = self.GetInstanceIDFromKey(string(iter.Key()))
+		if *instanceId == MINCHOSEN_KEY || *instanceId == SYSTEMVARIABLES_KEY || *instanceId == MASTERVARIABLES_KEY {
+			iter.Prev()
+		} else {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("not found")
+}
+
+func (self *Database) GetInstanceIDFromKey(key string) uint64 {
+	instanceId, _ := strconv.ParseUint(key, 10, 64)
+	return instanceId
 }
 
 func (self *Database) RebuildOneIndex(instanceId uint64, fileIdstr string) error {
 	return nil
 }
 
-func (self *Database) Get(instanceId uint64, value string) error {
+func (self *Database) Get(instanceId uint64, value *string) error {
 	var err error
 
 	if !self.hasInit {
@@ -77,10 +123,27 @@ func (self *Database) Get(instanceId uint64, value string) error {
 		return err
 	}
 
+	var fileInstanceId uint64
+	err = self.FileIdToValue(fileId, &fileInstanceId, value)
+	if err != nil {
+		return err
+	}
+
+	if fileInstanceId != instanceId {
+		return fmt.Errorf("file instance id %d not equal to instance id %d", fileInstanceId, instanceId)
+	}
+
+	return nil
 }
 
-func (self *Database) FileIdToValue(fileId string, instanceId uint64, value *string) error {
-	err := self.valueStore.
+func (self *Database) FileIdToValue(fileId string, instanceId *uint64, value *string) error {
+	err := self.valueStore.Read(fileId, instanceId, value)
+	if err != nil {
+		log.Error("fail, ret %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func (self *Database) GenKey(instanceId uint64) string {
