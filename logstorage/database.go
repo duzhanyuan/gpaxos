@@ -1,7 +1,6 @@
 package logstorage
 
 import (
-	"bytes"
 	"fmt"
 
 	leveldb "github.com/syndtr/goleveldb/leveldb"
@@ -19,18 +18,19 @@ const SYSTEMVARIABLES_KEY = math.MaxUint64 - 1
 const MASTERVARIABLES_KEY = math.MaxUint64 - 2
 
 type WriteOptions struct {
+	sync bool
 }
 
 type Database struct {
 	valueStore LogStore
 	hasInit    bool
-	myGroupIdx int
+	myGroupIdx int32
 	dbPath     string
 	comparator PaxosComparator
 	leveldb    *leveldb.DB
 }
 
-func (self *Database) Init(dbPath string, groupId int) error {
+func (self *Database) Init(dbPath string, groupId int32) error {
 	var err error
 	if self.hasInit {
 		return nil
@@ -65,6 +65,11 @@ func (self *Database) Init(dbPath string, groupId int) error {
 
 func (self *Database) GetMaxInstanceIDFileID(fileId *string, instanceId *uint64) error {
 	var maxInstanceId uint64
+
+	err := self.GetMaxInstanceID(&maxInstanceId)
+	if err != nil {
+		return err
+	}
 
 	key := self.GenKey(maxInstanceId)
 	value, err := self.leveldb.Get([]byte(key), &opt.ReadOptions{})
@@ -106,7 +111,34 @@ func (self *Database) GetInstanceIDFromKey(key string) uint64 {
 }
 
 func (self *Database) RebuildOneIndex(instanceId uint64, fileIdstr string) error {
+	key := self.GenKey(instanceId)
+
+	opt := opt.WriteOptions{
+		Sync: false,
+	}
+
+	err := self.leveldb.Put([]byte(key), []byte(fileIdstr), &opt)
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+func (self *Database) Put(options WriteOptions, instanceId uint64, value string) error {
+	var err error
+
+	if !self.hasInit {
+		err = fmt.Errorf("not init yet")
+		return err
+	}
+
+	var fileId string
+	err = self.ValueToFileId(options, instanceId, value, &fileId)
+	if err != nil {
+		return err
+	}
+
+	return self.PutToLevelDB(false, instanceId, []byte(value))
 }
 
 func (self *Database) Get(instanceId uint64, value *string) error {
@@ -160,23 +192,6 @@ func (self *Database) GetFromLevelDb(instanceId uint64, value *string) error {
 
 	*value = string(ret)
 	return nil
-}
-
-func (self *Database) Put(options WriteOptions, instanceId uint64, value string) error {
-	var err error
-
-	if !self.hasInit {
-		err = fmt.Errorf("not init yet")
-		return err
-	}
-
-	var fileId string
-	err = self.ValueToFileId(options, instanceId, value, &fileId)
-	if err != nil {
-		return err
-	}
-
-	return self.PutToLevelDB(false, instanceId, bytes.NewBufferString(fileId).Bytes())
 }
 
 func (self *Database) ValueToFileId(options WriteOptions, instanceId uint64, value string, fileId *string) error {

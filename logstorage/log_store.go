@@ -37,7 +37,7 @@ type LogStore struct {
 	File          *os.File
 }
 
-func (self *LogStore) Init(path string, groupIdx int, db *Database) error {
+func (self *LogStore) Init(path string, groupIdx int32, db *Database) error {
 	self.MyGroupIdx = groupIdx
 	self.Path = path + "/vfile"
 	err := syscall.Access(self.Path, syscall.F_OK)
@@ -151,9 +151,6 @@ func (self *LogStore) RebuildIndex(db *Database, nowOffset *uint64) error {
 	return nil
 }
 
-func (self *LogStore) ReadData(fileId int32, offset uint64, cksum uint32, buffer *string) error {
-}
-
 func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *string) error {
 	var fileId int32
 	var offset uint64
@@ -165,7 +162,7 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *string)
 		return err
 	}
 
-	_, err = file.Seek(offset, os.SEEK_SET)
+	_, err = file.Seek(int64(offset), os.SEEK_SET)
 	if err != nil {
 		return err
 	}
@@ -176,22 +173,22 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *string)
 		return err
 	}
 	if n != util.INT32SIZE {
-
+		return fmt.Errorf("read len %d not equal to %d", n, util.INT32SIZE)
 	}
 
-	len, err := strconv.Atoi(string(tmpbuf))
+	bufferlen, err := strconv.Atoi(string(tmpbuf))
 	if err != nil {
 		return err
 	}
 
-	tmpbuf = make([]byte, len)
+	tmpbuf = make([]byte, bufferlen)
 	n, err = file.Read(tmpbuf)
 	if err != nil {
 		return err
 	}
 
-	if n != len {
-		return fmt.Errorf("read len %d not equal to %d", n, len)
+	if n != bufferlen {
+		return fmt.Errorf("read len %d not equal to %d", n, bufferlen)
 	}
 
 	fileCkSum := util.Crc32(0, tmpbuf, common.CRC32_SKIP)
@@ -199,15 +196,12 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *string)
 		return fmt.Errorf("cksum not equal, file cksum %d, cksum %d", fileCkSum, cksum)
 	}
 
-	err = util.DecodeUint64(tmpbuf, 0, instanceId)
-	if err != nil {
-		return err
-	}
+	util.DecodeUint64(tmpbuf, 0, instanceId)
 
-	buffer = string(tmpbuf[util.UINT64SIZE:])
+	*buffer = string(tmpbuf[util.UINT64SIZE:])
 
 	log.Info("ok, fileid %d offset %d instanceid %d buffser size %d",
-		fileId, offset, *instanceId, len(buffer))
+		fileId, offset, *instanceId, bufferlen-util.UINT64SIZE)
 
 	return nil
 }
