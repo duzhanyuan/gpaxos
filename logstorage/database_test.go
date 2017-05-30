@@ -3,18 +3,16 @@ package logstorage
 import (
 	"fmt"
 	"testing"
-
-	"github.com/lichuang/gpaxos/logstorage"
 )
 
 func Test_basic(t *testing.T) {
-	db := logstorage.Database{}
+	db := Database{}
 	testValue := "test"
 	var testInstanceId uint64 = 111
 
 	db.Init("./tmp", 0)
 
-	err := db.Put(logstorage.WriteOptions{}, testInstanceId, testValue)
+	err := db.Put(WriteOptions{}, testInstanceId, testValue)
 	if err != nil {
 		fmt.Printf("put error: %v", err)
 		return

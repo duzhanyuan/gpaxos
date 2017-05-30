@@ -12,34 +12,59 @@ import (
 
 	proto "github.com/golang/protobuf/proto"
 
+	"sync"
+
+	"time"
+
 	"github.com/lichuang/gpaxos/common"
 	"github.com/lichuang/gpaxos/log"
 	"github.com/lichuang/gpaxos/util"
 )
 
 type fileLogger struct {
+	File *os.File
 }
 
 func (self *fileLogger) Init(path string) {
-
+	filePath := fmt.Sprintf("%s/LOG", path)
+	self.File, _ = os.Open(filePath)
 }
 
-func (self *fileLogger) Log(fmt string, args ...interface{}) {
+func (self *fileLogger) Log(format string, args ...interface{}) {
+	if self.File == nil {
+		return
+	}
+
+	nowTimeMs := time.Now().UnixNano() / 1000000
+	timePrefix := time.Now().Format("2006-01-02 15:04:05")
+
+	prefix := fmt.Sprintf("%s:%d", timePrefix, nowTimeMs%1000)
+	newFormat := prefix + format + "\n"
+
+	buf := fmt.Sprintf(newFormat, args)
+	self.File.Write([]byte(buf))
 }
 
 type LogStore struct {
-	MyGroupIdx    int32
-	Path          string
-	FileLogger    fileLogger
-	MetaFile      *os.File
-	FileId        int32
-	NowFileOffset uint64
-	File          *os.File
+	MyGroupIdx       int32
+	Path             string
+	FileLogger       fileLogger
+	MetaFile         *os.File
+	FileId           int32
+	NowFileOffset    uint64
+	NowFileSize      uint64
+	File             *os.File
+	ReadMutex        sync.Mutex
+	Mutex            sync.Mutex
+	DeletedMaxFileId int32
 }
 
 func (self *LogStore) Init(path string, groupIdx int32, db *Database) error {
+	self.DeletedMaxFileId = -1
 	self.MyGroupIdx = groupIdx
 	self.Path = path + "/vfile"
+	self.File = nil
+
 	err := syscall.Access(self.Path, syscall.F_OK)
 	if err != nil {
 		err := os.Mkdir(self.Path, os.ModePerm)
@@ -71,20 +96,17 @@ func (self *LogStore) Init(path string, groupIdx int32, db *Database) error {
 			return fmt.Errorf("read meta file %s info fail, real len %d", metaFile.Name(), n)
 		}
 	}
-	fileIdstr := string(buff)
-	fileId, _ := strconv.Atoi(fileIdstr)
-	self.FileId = int32(fileId)
+	util.DecodeInt32(buff, 0, &self.FileId)
+	ckSum := util.Crc32(0, buff, 0)
 
 	var metaCkSum uint32
 	buff = make([]byte, util.UINT32SIZE)
 	n, err = metaFile.Read(buff)
 	if n == util.UINT32SIZE {
-		sum, _ := strconv.Atoi(string(buff))
-		metaCkSum = uint32(sum)
-		ckSum := util.Crc32(0, []byte(fileIdstr), 1)
+		util.DecodeUint32(buff, 0, &metaCkSum)
 		if metaCkSum != ckSum {
-			return fmt.Errorf("meta file checksum %d not same to cal checksum %d, file id %s",
-				metaCkSum, ckSum, fileIdstr)
+			return fmt.Errorf("meta file checksum %d not same to cal checksum %d, file id %d",
+				metaCkSum, ckSum, self.FileId)
 		}
 	}
 
@@ -98,12 +120,79 @@ func (self *LogStore) Init(path string, groupIdx int32, db *Database) error {
 		return err
 	}
 
+	err = self.ExpendFile(self.File, &self.NowFileSize)
+	if err != nil {
+		return err
+	}
+
 	nowFileOffset, err := self.File.Seek(int64(self.NowFileOffset), os.SEEK_SET)
 	if err != nil {
 		return err
 	}
 	self.NowFileOffset = uint64(nowFileOffset)
 
+	return nil
+}
+
+func (self *LogStore) ExpendFile(file *os.File, fileSize *uint64) error {
+	var err error
+	var size int64
+	size, err = file.Seek(0, os.SEEK_END)
+	if err != nil {
+		return err
+	}
+	*fileSize = uint64(size)
+
+	if *fileSize == 0 {
+		maxLogFileSize := common.GetLogFileMaxSize()
+		size, err = file.Seek(maxLogFileSize-1, os.SEEK_SET)
+		*fileSize = uint64(size)
+		if err != nil {
+			return err
+		}
+
+		file.Write([]byte{0})
+
+		*fileSize = uint64(maxLogFileSize)
+		file.Seek(0, os.SEEK_SET)
+		self.NowFileOffset = 0
+	}
+
+	return nil
+}
+
+func (self *LogStore) IncreaseFileId() error {
+	fileId := self.FileId + 1
+	buffer := make([]byte, util.INT32SIZE)
+	util.EncodeInt32(buffer, 0, fileId)
+
+	_, err := self.MetaFile.Seek(0, os.SEEK_SET)
+	if err != nil {
+		return err
+	}
+
+	n, err := self.MetaFile.Write(buffer)
+	if err != nil {
+		return err
+	}
+	if n != util.INT32SIZE {
+		return fmt.Errorf("write len %d not equal to %d", n, util.INT32SIZE)
+	}
+	ckSum := util.Crc32(0, buffer, 0)
+	buffer = make([]byte, util.UINT32SIZE)
+	util.EncodeUint32(buffer, 0, ckSum)
+	n, err = self.MetaFile.Write(buffer)
+	if err != nil {
+		return err
+	}
+
+	if n != util.UINT32SIZE {
+		return fmt.Errorf("write len %d not equal to %d", n, util.UINT32SIZE)
+	}
+
+	self.MetaFile.Sync()
+
+	self.FileId += 1
 	return nil
 }
 
@@ -180,6 +269,9 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *string)
 	if err != nil {
 		return err
 	}
+
+	self.ReadMutex.Lock()
+	defer self.ReadMutex.Unlock()
 
 	tmpbuf = make([]byte, bufferlen)
 	n, err = file.Read(tmpbuf)
@@ -331,7 +423,184 @@ func (self *LogStore) OpenFile(fileId int32) (*os.File, error) {
 	return os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 }
 
-func (self *LogStore) Append(options WriteOptions, instanceId uint64, value string, fileId *string) error {
+func (self *LogStore) DeleteFile(fileId int32) error {
+	if self.DeletedMaxFileId == -1 {
+		if fileId-2000 > 0 {
+			self.DeletedMaxFileId = fileId - 2000
+		}
+	}
+
+	if fileId <= self.DeletedMaxFileId {
+		log.Debug("file already deleted, fileid %d deletedmaxfileid %d", fileId, self.DeletedMaxFileId)
+		return nil
+	}
+
+	var err error
+	for deleteFileId := self.DeletedMaxFileId + 1; deleteFileId <= fileId; deleteFileId++ {
+		filePath := fmt.Sprintf("%s/%d.f", self.Path, deleteFileId)
+
+		err = syscall.Access(filePath, syscall.F_OK)
+		if err != nil {
+			log.Debug("file already deleted, filepath %s", filePath)
+			self.DeletedMaxFileId = deleteFileId
+			err = nil
+			continue
+		}
+
+		err = os.Remove(filePath)
+		if err != nil {
+			log.Error("remove fail, file path %s error: %v", filePath, err)
+			break
+		}
+
+		self.DeletedMaxFileId = deleteFileId
+		self.FileLogger.Log("delete fileid %d", deleteFileId)
+	}
+
+	return err
+}
+
+func (self *LogStore) Del(fileIdStr string, instanceId uint64) error {
+	var fileId int32 = -1
+	var offset uint64
+	var cksum uint32
+	self.DecodeFileId(fileIdStr, &fileId, &offset, &cksum)
+
+	if fileId > self.FileId {
+		return fmt.Errorf("del fileid %d larger than using fileid %d", fileId, self.FileId)
+	}
+
+	if fileId > 0 {
+		return self.DeleteFile(fileId - 1)
+	}
+
+	return nil
+}
+
+func (self *LogStore) ForceDel(fileIdStr string, instanceId uint64) error {
+	var fileId int32
+	var offset uint64
+	var cksum uint32
+	self.DecodeFileId(fileIdStr, &fileId, &offset, &cksum)
+
+	if self.FileId != fileId {
+		err := fmt.Errorf("del fileid %d not equal to fileid %d", fileId, self.FileId)
+		log.Error("%v", err)
+		return err
+	}
+
+	filePath := fmt.Sprintf("%s/%d.f", self.Path, fileId)
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+
+	file.Truncate(int64(offset))
+	return nil
+}
+
+func (self *LogStore) IsValidFileId(fileIdStr string) bool {
+	return len(fileIdStr) == (util.INT32SIZE + util.INT32SIZE + util.UINT32SIZE)
+}
+
+func (self *LogStore) GetFileId(needWriteSize uint32, fileId *int32, offset *uint32) error {
+	var err error
+	if self.File == nil {
+		err = fmt.Errorf("file already broken, file id %d", self.FileId)
+		log.Error("%v", err)
+		return err
+	}
+
+	ret, err := self.File.Seek(int64(self.NowFileOffset), os.SEEK_SET)
+	if err != nil {
+		return err
+	}
+	*offset = uint32(ret)
+
+	if uint64(*offset+needWriteSize) > self.NowFileSize {
+		self.File.Close()
+		self.File = nil
+
+		err = self.IncreaseFileId()
+		if err != nil {
+			self.FileLogger.Log("new file increase fileid fail, now fileid %d", self.FileId)
+			return err
+		}
+
+		self.File, err = self.OpenFile(self.FileId)
+		if err != nil {
+			self.FileLogger.Log("new file increase fileid fail, now fileid %d", self.FileId)
+			return err
+		}
+
+		ret = -1
+		ret, err = self.File.Seek(0, os.SEEK_END)
+		if ret != 0 {
+			self.FileLogger.Log("new file but file already exist,now file id %d exist filesize %d", self.FileId, ret)
+			err = fmt.Errorf("Increase file id success, but file exist, data wrong, file size %d", ret)
+			return err
+		}
+		*offset = uint32(ret)
+
+		err = self.ExpendFile(self.File, &self.NowFileSize)
+		if err != nil {
+			err = fmt.Errorf("new file expand fail, file id %d", self.FileId)
+			self.FileLogger.Log("new file expand file fail, now file id %d", self.FileId)
+			self.File.Close()
+			self.File = nil
+			return err
+		}
+
+		self.FileLogger.Log("new file expand ok, file id %d filesize %d", self.FileId, self.NowFileSize)
+	}
+
+	*fileId = self.FileId
+	return nil
+}
+
+func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer string, fileIdStr *string) error {
+	begin := time.Now().UnixNano()
+
+	self.Mutex.Lock()
+	defer self.Mutex.Unlock()
+
+	bufferLen := len(buffer)
+	len := util.UINT64SIZE + bufferLen
+	tmpBufLen := len + util.INT32SIZE
+
+	var fileId int32
+	var offset uint32
+	err := self.GetFileId(uint32(tmpBufLen), &fileId, &offset)
+	if err != nil {
+		return err
+	}
+
+	tmpBuf := make([]byte, tmpBufLen)
+	util.EncodeInt32(tmpBuf, 0, int32(len))
+	util.EncodeUint64(tmpBuf, util.INT32SIZE, instanceId)
+	copy(tmpBuf[util.INT32SIZE+util.UINT64SIZE:], buffer)
+
+	ret, err := self.File.Write(tmpBuf)
+	if ret != tmpBufLen {
+		err = fmt.Errorf("writelen %d not equal to %d,buffer size %d",
+			ret, tmpBufLen, bufferLen)
+		return err
+	}
+
+	if options.sync {
+		self.File.Sync()
+	}
+
+	self.NowFileOffset += uint64(tmpBufLen)
+
+	ckSum := util.Crc32(0, tmpBuf[util.INT32SIZE:], common.CRC32_SKIP)
+	self.EncodeFileId(fileId, uint64(offset), ckSum, fileIdStr)
+
+	useMs := (time.Now().UnixNano() - begin) / 1000000
+
+	log.Info("ok, offset %d fileid %d cksum %d instanceid %d buffersize %d usetime %d ms sync %d",
+		offset, fileId, ckSum, instanceId, useMs, bufferLen)
 	return nil
 }
 
