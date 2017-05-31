@@ -1,6 +1,19 @@
 syntax = "proto2";
 package common;
 
+message PaxosNodeInfo
+{
+  required uint64 Rid = 1;
+  required uint64 Nodeid = 2;
+};
+
+message SystemVariables
+{
+  required uint64 Gid = 1;
+  repeated PaxosNodeInfo MemberShip = 2;
+  required uint64 Version = 3;
+};
+
 message AcceptorStateData
 {
   required uint64 InstanceID = 1;
