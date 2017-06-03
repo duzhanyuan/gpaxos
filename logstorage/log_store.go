@@ -248,6 +248,7 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *string)
 
 	file, err := self.OpenFile(fileId)
 	if err != nil {
+		log.Error("openfile %s error %v", fileId, err)
 		return err
 	}
 

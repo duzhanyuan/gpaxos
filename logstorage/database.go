@@ -10,7 +10,9 @@ import (
 
 	"strconv"
 
+	"github.com/lichuang/gpaxos/common"
 	"github.com/lichuang/gpaxos/log"
+	"github.com/lichuang/gpaxos/util"
 )
 
 const MINCHOSEN_KEY = math.MaxUint64
@@ -63,6 +65,10 @@ func (self *Database) Init(dbPath string, groupId int32) error {
 	return nil
 }
 
+func (self *Database) GetDBPath() string {
+	return self.dbPath
+}
+
 func (self *Database) GetMaxInstanceIDFileID(fileId *string, instanceId *uint64) error {
 	var maxInstanceId uint64
 
@@ -74,6 +80,7 @@ func (self *Database) GetMaxInstanceIDFileID(fileId *string, instanceId *uint64)
 	key := self.GenKey(maxInstanceId)
 	value, err := self.leveldb.Get([]byte(key), &opt.ReadOptions{})
 	if err != nil {
+		log.Error("leveldb.get fail:%v", err)
 		return err
 	}
 
@@ -119,6 +126,7 @@ func (self *Database) RebuildOneIndex(instanceId uint64, fileIdstr string) error
 
 	err := self.leveldb.Put([]byte(key), []byte(fileIdstr), &opt)
 	if err != nil {
+		log.Error("leveldb.Put fail, instanceid %d valuelen %d", instanceId, len(fileIdstr))
 		return err
 	}
 	return nil
@@ -146,7 +154,7 @@ func (self *Database) Get(instanceId uint64, value *string) error {
 
 	if !self.hasInit {
 		err = fmt.Errorf("not init yet")
-		return err
+		return common.ErrDbNotInit
 	}
 
 	var fileId string
@@ -162,7 +170,8 @@ func (self *Database) Get(instanceId uint64, value *string) error {
 	}
 
 	if fileInstanceId != instanceId {
-		return fmt.Errorf("file instance id %d not equal to instance id %d", fileInstanceId, instanceId)
+		log.Error("file instance id %d not equal to instance id %d", fileInstanceId, instanceId)
+		return common.ErrInvalidInstanceId
 	}
 
 	return nil
@@ -182,15 +191,57 @@ func (self *Database) GenKey(instanceId uint64) string {
 	return fmt.Sprintf("%d", instanceId)
 }
 
-func (self *Database) GetFromLevelDb(instanceId uint64, value *string) error {
+func (self *Database) GetMinChosenInstanceID(minInstanceId *uint64) error {
+	if !self.hasInit {
+		log.Error("db not init yet")
+		return common.ErrDbNotInit
+	}
+
+	var value string
+	err := self.GetFromLevelDb(MINCHOSEN_KEY, &value)
+	if err != common.ErrGetFail {
+		return err
+	}
+
+	if err == common.ErrKeyNotFound {
+		log.Error("no min chsoen instanceid")
+		*minInstanceId = 0
+		return nil
+	}
+
+	if self.valueStore.IsValidFileId(value) {
+		err = self.Get(instance, &value)
+		if err != nil {
+			log.Error("get from long store fail:%v", err)
+			return err
+		}
+	}
+
+	if len(value) != util.UINT64SIZE {
+		log.Error("fail, mininstanceid size wrong")
+		return common.ErrInvalidInstanceId
+	}
+
+	util.DecodeUint64([]byte(value), 0, minInstanceId)
+	log.Info("ok, min chosen instanceid:%d", *minInstanceId)
+	return nil
+}
+
+func (self *Database) GetFromLevelDb(instanceId uint64, value *[]byte) error {
 	key := self.GenKey(instanceId)
 
 	ret, err := self.leveldb.Get([]byte(key), nil)
 	if err != nil {
-		return err
+		if err == leveldb.ErrNotFound {
+			log.Error("leveldb.get not found, instanceid %d", instanceId)
+			return common.ErrKeyNotFound
+		}
+
+		log.Error("leveldb.get fail, instanceid %d", instanceId)
+		return common.ErrGetFail
 	}
 
-	*value = string(ret)
+	*value = ret
 	return nil
 }
 
@@ -216,4 +267,53 @@ func (self *Database) PutToLevelDB(sync bool, instanceId uint64, value []byte) e
 	}
 
 	return nil
+}
+
+func (self *Database) ForceDel(options WriteOptions, instanceId uint64) error {
+	if !self.hasInit {
+		err := fmt.Errorf("no init yet")
+		log.Error("%v", err)
+		return err
+	}
+
+	key := self.GenKey(instanceId)
+	fileId, err := self.leveldb.Get([]byte(key), &opt.ReadOptions{})
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			log.Error("leveldb.get not found, instance:%d", instanceId)
+		}
+		log.Error("leveldb.get fail:%v", err)
+		return err
+	}
+
+	err = self.valueStore.ForceDel(string(fileId), instanceId)
+	if err != nil {
+		return err
+	}
+
+	writeOptions := opt.WriteOptions{
+		Sync: options.sync,
+	}
+	err = self.leveldb.Delete([]byte(key), &writeOptions)
+	if err != nil {
+		log.Error("leveldb.delete fail, instanceid %d, err:%v", instanceId, err)
+		return err
+	}
+	return nil
+}
+
+func (self *Database) SetSystemVariables(options WriteOptions, buffer []byte) error {
+	return self.PutToLevelDB(true, SYSTEMVARIABLES_KEY, buffer)
+}
+
+func (self *Database) GetSystemVariables(buffer []byte) error {
+	return self.GetFromLevelDb(SYSTEMVARIABLES_KEY, buffer)
+}
+
+func (self *Database) SetMasterVariables(options WriteOptions, buffer []byte) error {
+	return self.PutToLevelDB(true, MASTERVARIABLES_KEY, buffer)
+}
+
+func (self *Database) GetMasterVariables(buffer *[]byte) error {
+	return self.GetFromLevelDb(MASTERVARIABLES_KEY, buffer)
 }
