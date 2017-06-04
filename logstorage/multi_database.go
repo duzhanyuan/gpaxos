@@ -33,7 +33,7 @@ func (self *MultiDatabase) Init(dbPath string, groupCount int32) error {
 	for i := 0; int32(i) < groupCount; i++ {
 		groupDbPath := fmt.Sprintf("%sg%d", dbPath, i)
 		db := new(Database)
-		err = db.Init(dbPath, int32(i))
+		err = db.Init(groupDbPath, int32(i))
 		if err != nil {
 			return err
 		}
@@ -100,6 +100,14 @@ func (self *MultiDatabase) GetMinChosenInstanceID(groupIdx int32, minInstanceId 
 	}
 
 	return self.DbList[groupIdx].GetMinChosenInstanceID(minInstanceId)
+}
+
+func (self *MultiDatabase) ClearAllLog(groupIdx int32) error {
+	if groupIdx >= self.DbNum {
+		return common.ErrInvalidGroupIndex
+	}
+
+	return self.DbList[groupIdx].ClearAllLog()
 }
 
 func (self *MultiDatabase) SetSystemVariables(options WriteOptions, groupIdx int32, buffer []byte) error {
