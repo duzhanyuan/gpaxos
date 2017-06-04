@@ -2,20 +2,14 @@ package logstorage
 
 import (
 	"bytes"
-	"os"
-
-	"strconv"
-
 	"fmt"
-
-	"syscall"
-
-	proto "github.com/golang/protobuf/proto"
-
+	"os"
+	"strconv"
 	"sync"
-
+	"syscall"
 	"time"
 
+	proto "github.com/golang/protobuf/proto"
 	"github.com/lichuang/gpaxos/common"
 	"github.com/lichuang/gpaxos/log"
 	"github.com/lichuang/gpaxos/util"
@@ -64,6 +58,7 @@ func (self *LogStore) Init(path string, groupIdx int32, db *Database) error {
 	self.MyGroupIdx = groupIdx
 	self.Path = path + "/vfile"
 	self.File = nil
+	self.FileId = -1
 
 	err := syscall.Access(self.Path, syscall.F_OK)
 	if err != nil {
@@ -131,6 +126,12 @@ func (self *LogStore) Init(path string, groupIdx int32, db *Database) error {
 	}
 	self.NowFileOffset = uint64(nowFileOffset)
 
+	self.FileLogger.Log("init write fileid %d now_write_offset %d filesize %d",
+		self.FileId, self.NowFileOffset, self.NowFileSize)
+
+	log.Info("ok, path %s fileid %d meta cksum %d nowfilesize %d nowfilewriteoffset %d",
+		self.Path, self.FileId, metaCkSum, self.NowFileSize, self.NowFileOffset)
+
 	return nil
 }
 
@@ -196,229 +197,6 @@ func (self *LogStore) IncreaseFileId() error {
 	return nil
 }
 
-func (self *LogStore) RebuildIndex(db *Database, nowOffset *uint64) error {
-	var lastFileId string
-	var nowInstanceId uint64
-
-	err := db.GetMaxInstanceIDFileID(&lastFileId, &nowInstanceId)
-	if err != nil {
-		return err
-	}
-
-	var fileId int32
-	var offset uint64
-	var cksum uint32
-	if len(lastFileId) > 0 {
-		self.DecodeFileId(lastFileId, &fileId, &offset, &cksum)
-	}
-
-	if fileId > self.FileId {
-		return fmt.Errorf("leveldb last fileid %d lagger than meta now fileid %d", fileId, self.FileId)
-	}
-
-	log.Info("start fileid %d offset %d checksum %d", fileId, offset, cksum)
-
-	nowFileId := fileId
-	for {
-		err = self.RebuildIndexForOneFile(nowFileId, offset, db, nowOffset, &nowInstanceId)
-		if err != nil {
-			break
-		}
-
-		if nowFileId != 0 && nowFileId != self.FileId+1 {
-			err = fmt.Errorf("meta file wrong, now file id %d meta file id %d", nowFileId, self.FileId)
-			log.Error("%v", err)
-			return err
-		}
-		err = nil
-		log.Info("end rebuild ok, now file id:%d", nowFileId)
-
-		offset = 0
-
-		nowFileId++
-	}
-	return nil
-}
-
-func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *string) error {
-	var fileId int32
-	var offset uint64
-	var cksum uint32
-	self.DecodeFileId(fileIdstr, &fileId, &offset, &cksum)
-
-	file, err := self.OpenFile(fileId)
-	if err != nil {
-		log.Error("openfile %s error %v", fileId, err)
-		return err
-	}
-
-	_, err = file.Seek(int64(offset), os.SEEK_SET)
-	if err != nil {
-		return err
-	}
-
-	tmpbuf := make([]byte, util.INT32SIZE)
-	n, err := file.Read(tmpbuf)
-	if err != nil {
-		return err
-	}
-	if n != util.INT32SIZE {
-		return fmt.Errorf("read len %d not equal to %d", n, util.INT32SIZE)
-	}
-
-	bufferlen, err := strconv.Atoi(string(tmpbuf))
-	if err != nil {
-		return err
-	}
-
-	self.ReadMutex.Lock()
-	defer self.ReadMutex.Unlock()
-
-	tmpbuf = make([]byte, bufferlen)
-	n, err = file.Read(tmpbuf)
-	if err != nil {
-		return err
-	}
-
-	if n != bufferlen {
-		return fmt.Errorf("read len %d not equal to %d", n, bufferlen)
-	}
-
-	fileCkSum := util.Crc32(0, tmpbuf, common.CRC32_SKIP)
-	if fileCkSum != cksum {
-		return fmt.Errorf("cksum not equal, file cksum %d, cksum %d", fileCkSum, cksum)
-	}
-
-	util.DecodeUint64(tmpbuf, 0, instanceId)
-
-	*buffer = string(tmpbuf[util.UINT64SIZE:])
-
-	log.Info("ok, fileid %d offset %d instanceid %d buffser size %d",
-		fileId, offset, *instanceId, bufferlen-util.UINT64SIZE)
-
-	return nil
-}
-
-func (self *LogStore) RebuildIndexForOneFile(fileId int32, offset uint64, db *Database, nowWriteOffset *uint64, nowInstanceId *uint64) error {
-	var err error = nil
-
-	var file *os.File = nil
-	defer func() {
-		if file != nil {
-			file.Close()
-		}
-	}()
-	filePath := fmt.Sprintf("%s/%d.f", self.Path, fileId)
-
-	err = syscall.Access(filePath, syscall.F_OK)
-	if err != nil {
-		return err
-	}
-
-	file, err = self.OpenFile(fileId)
-	if err != nil {
-		return err
-	}
-
-	fileLen, err := file.Seek(0, os.SEEK_END)
-	if err != nil {
-		file.Close()
-		return err
-	}
-
-	_, err = file.Seek(int64(offset), os.SEEK_SET)
-	if err != nil {
-		file.Close()
-		return err
-	}
-
-	var nowOffset = offset
-	var needTruncate = false
-
-	for {
-		buffer := make([]byte, util.INT32SIZE)
-		n, err := file.Read(buffer)
-		if n == 0 {
-			*nowWriteOffset = nowOffset
-			log.Debug("file end, file id %d offset %d", fileId, nowOffset)
-			err = nil
-			break
-		}
-
-		if n != util.INT32SIZE {
-			needTruncate = true
-			log.Error("read len %d not equal to %d, need truncate", n, util.INT32SIZE)
-			err = nil
-			break
-		}
-
-		len, _ := strconv.Atoi(string(buffer))
-		if len == 0 {
-			*nowWriteOffset = nowOffset
-			log.Debug("file end, file id %d offset %d", fileId, nowOffset)
-			break
-		}
-
-		if int64(len) > fileLen || len < util.UINT64SIZE {
-			err = fmt.Errorf("file data len wrong, data len %d filelen %d", len, fileLen)
-			log.Error("%v", err)
-			break
-		}
-
-		buffer = make([]byte, len)
-		n, err = file.Read(buffer)
-		if n != len {
-			needTruncate = true
-			log.Error("read len %d not equal to %d, need truncate", n, len)
-			break
-		}
-
-		var instanceId uint64
-		util.DecodeUint64(buffer, 0, &instanceId)
-
-		if instanceId < *nowInstanceId {
-			log.Error("file data wrong,read instanceid %d smaller than now instanceid %d", instanceId, *nowInstanceId)
-			break
-		}
-
-		*nowInstanceId = instanceId
-
-		var state common.AcceptorStateData
-		err = proto.Unmarshal(buffer[util.UINT64SIZE:], &state)
-		if err != nil {
-			self.NowFileOffset = uint64(nowOffset)
-			needTruncate = true
-			log.Error("this instance buffer wrong, can't parse to acceptState, instanceid %d bufferlen %d nowoffset %d",
-				instanceId, len-util.UINT64SIZE, nowOffset)
-			break
-		}
-
-		fileCkSum := util.Crc32(0, buffer, common.CRC32_SKIP)
-		var fileIdstr string
-		self.EncodeFileId(fileId, nowOffset, fileCkSum, &fileIdstr)
-
-		err = db.RebuildOneIndex(instanceId, fileIdstr)
-		if err != nil {
-			break
-		}
-
-		log.Info("rebuild one index ok, fileid %d offset %d instanceid %d cksum %d buffer size %d",
-			fileId, nowOffset, instanceId, fileCkSum, len-util.UINT64SIZE)
-
-		nowOffset += uint64(util.INT32SIZE) + uint64(len)
-	}
-
-	if needTruncate {
-		self.FileLogger.Log("truncate fileid %d offset %d filesize %d", fileId, nowOffset, fileLen)
-		err = os.Truncate(filePath, int64(nowOffset))
-		if err != nil {
-			log.Error("truncate fail, file path %s truncate to length %d error:%v",
-				filePath, nowOffset, err)
-		}
-	}
-	return err
-}
-
 func (self *LogStore) OpenFile(fileId int32) (*os.File, error) {
 	filePath := fmt.Sprintf("%s/%d.f", self.Path, fileId)
 	return os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, os.ModePerm)
@@ -459,50 +237,6 @@ func (self *LogStore) DeleteFile(fileId int32) error {
 	}
 
 	return err
-}
-
-func (self *LogStore) Del(fileIdStr string, instanceId uint64) error {
-	var fileId int32 = -1
-	var offset uint64
-	var cksum uint32
-	self.DecodeFileId(fileIdStr, &fileId, &offset, &cksum)
-
-	if fileId > self.FileId {
-		return fmt.Errorf("del fileid %d larger than using fileid %d", fileId, self.FileId)
-	}
-
-	if fileId > 0 {
-		return self.DeleteFile(fileId - 1)
-	}
-
-	return nil
-}
-
-func (self *LogStore) ForceDel(fileIdStr string, instanceId uint64) error {
-	var fileId int32
-	var offset uint64
-	var cksum uint32
-	self.DecodeFileId(fileIdStr, &fileId, &offset, &cksum)
-
-	if self.FileId != fileId {
-		err := fmt.Errorf("del fileid %d not equal to fileid %d", fileId, self.FileId)
-		log.Error("%v", err)
-		return err
-	}
-
-	filePath := fmt.Sprintf("%s/%d.f", self.Path, fileId)
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-
-	file.Truncate(int64(offset))
-	return nil
-}
-
-func (self *LogStore) IsValidFileId(fileIdStr string) bool {
-	return len(fileIdStr) == (util.INT32SIZE + util.INT32SIZE + util.UINT32SIZE)
 }
 
 func (self *LogStore) GetFileId(needWriteSize uint32, fileId *int32, offset *uint32) error {
@@ -605,6 +339,105 @@ func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer str
 	return nil
 }
 
+func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *string) error {
+	var fileId int32
+	var offset uint64
+	var cksum uint32
+	self.DecodeFileId(fileIdstr, &fileId, &offset, &cksum)
+
+	file, err := self.OpenFile(fileId)
+	if err != nil {
+		log.Error("openfile %s error %v", fileId, err)
+		return err
+	}
+
+	_, err = file.Seek(int64(offset), os.SEEK_SET)
+	if err != nil {
+		return err
+	}
+
+	tmpbuf := make([]byte, util.INT32SIZE)
+	n, err := file.Read(tmpbuf)
+	if err != nil {
+		return err
+	}
+	if n != util.INT32SIZE {
+		return fmt.Errorf("read len %d not equal to %d", n, util.INT32SIZE)
+	}
+
+	bufferlen, err := strconv.Atoi(string(tmpbuf))
+	if err != nil {
+		return err
+	}
+
+	self.ReadMutex.Lock()
+	defer self.ReadMutex.Unlock()
+
+	tmpbuf = make([]byte, bufferlen)
+	n, err = file.Read(tmpbuf)
+	if err != nil {
+		return err
+	}
+
+	if n != bufferlen {
+		return fmt.Errorf("read len %d not equal to %d", n, bufferlen)
+	}
+
+	fileCkSum := util.Crc32(0, tmpbuf, common.CRC32_SKIP)
+	if fileCkSum != cksum {
+		return fmt.Errorf("cksum not equal, file cksum %d, cksum %d", fileCkSum, cksum)
+	}
+
+	util.DecodeUint64(tmpbuf, 0, instanceId)
+
+	*buffer = string(tmpbuf[util.UINT64SIZE:])
+
+	log.Info("ok, fileid %d offset %d instanceid %d buffser size %d",
+		fileId, offset, *instanceId, bufferlen-util.UINT64SIZE)
+
+	return nil
+}
+
+func (self *LogStore) Del(fileIdStr string, instanceId uint64) error {
+	var fileId int32 = -1
+	var offset uint64
+	var cksum uint32
+	self.DecodeFileId(fileIdStr, &fileId, &offset, &cksum)
+
+	if fileId > self.FileId {
+		return fmt.Errorf("del fileid %d larger than using fileid %d", fileId, self.FileId)
+	}
+
+	if fileId > 0 {
+		return self.DeleteFile(fileId - 1)
+	}
+
+	return nil
+}
+
+func (self *LogStore) ForceDel(fileIdStr string, instanceId uint64) error {
+	var fileId int32
+	var offset uint64
+	var cksum uint32
+	self.DecodeFileId(fileIdStr, &fileId, &offset, &cksum)
+
+	if self.FileId != fileId {
+		err := fmt.Errorf("del fileid %d not equal to fileid %d", fileId, self.FileId)
+		log.Error("%v", err)
+		return err
+	}
+
+	filePath := fmt.Sprintf("%s/%d.f", self.Path, fileId)
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+
+	file.Truncate(int64(offset))
+	return nil
+}
+
 func (self *LogStore) EncodeFileId(fileId int32, offset uint64, cksum uint32, fileIdStr *string) {
 	buffer := make([]byte, util.INT32SIZE+util.UINT64SIZE+util.UINT32SIZE)
 	util.EncodeInt32(buffer, 0, fileId)
@@ -620,4 +453,175 @@ func (self *LogStore) DecodeFileId(fileIdStr string, fileId *int32, offset *uint
 	util.DecodeInt32(buffer, 0, fileId)
 	util.DecodeUint64(buffer, util.INT32SIZE, offset)
 	util.DecodeUint32(buffer, util.INT32SIZE+util.UINT64SIZE, cksum)
+}
+
+func (self *LogStore) IsValidFileId(fileIdStr string) bool {
+	return len(fileIdStr) == (util.INT32SIZE + util.INT32SIZE + util.UINT32SIZE)
+}
+
+func (self *LogStore) RebuildIndex(db *Database, nowOffset *uint64) error {
+	var lastFileId string
+	var nowInstanceId uint64
+
+	err := db.GetMaxInstanceIDFileID(&lastFileId, &nowInstanceId)
+	if err != nil {
+		return err
+	}
+
+	var fileId int32
+	var offset uint64
+	var cksum uint32
+	if len(lastFileId) > 0 {
+		self.DecodeFileId(lastFileId, &fileId, &offset, &cksum)
+	}
+
+	if fileId > self.FileId {
+		return fmt.Errorf("leveldb last fileid %d lagger than meta now fileid %d", fileId, self.FileId)
+	}
+
+	log.Info("start fileid %d offset %d checksum %d", fileId, offset, cksum)
+
+	for nowFileId := fileId; ; nowFileId++ {
+		err = self.RebuildIndexForOneFile(nowFileId, offset, db, nowOffset, &nowInstanceId)
+		if err != nil {
+			if err == common.ErrFileNotExist {
+				if nowFileId != 0 && nowFileId != self.FileId+1 {
+					err = fmt.Errorf("meta file wrong, now file id %d meta file id %d", nowFileId, self.FileId)
+					log.Error("%v", err)
+					return common.ErrInvalidMetaFileId
+				}
+				log.Info("end rebuild ok, now file id:%d", nowFileId)
+				err = nil
+			}
+			break
+		}
+
+		offset = 0
+	}
+
+	return err
+}
+
+func (self *LogStore) RebuildIndexForOneFile(fileId int32, offset uint64, db *Database, nowWriteOffset *uint64, nowInstanceId *uint64) error {
+	var err error = nil
+
+	var file *os.File = nil
+	defer func() {
+		if file != nil {
+			file.Close()
+		}
+	}()
+	filePath := fmt.Sprintf("%s/%d.f", self.Path, fileId)
+
+	err = syscall.Access(filePath, syscall.F_OK)
+	if err != nil {
+		log.Debug("file %s not exist", filePath)
+		return common.ErrFileNotExist
+	}
+
+	file, err = self.OpenFile(fileId)
+	if err != nil {
+		return err
+	}
+
+	fileLen, err := file.Seek(0, os.SEEK_END)
+	if err != nil {
+		file.Close()
+		return err
+	}
+
+	_, err = file.Seek(int64(offset), os.SEEK_SET)
+	if err != nil {
+		file.Close()
+		return err
+	}
+
+	var nowOffset = offset
+	var needTruncate = false
+
+	for {
+		buffer := make([]byte, util.INT32SIZE)
+		n, err := file.Read(buffer)
+		if n == 0 {
+			*nowWriteOffset = nowOffset
+			log.Debug("file end, file id %d offset %d", fileId, nowOffset)
+			err = nil
+			break
+		}
+
+		if n != util.INT32SIZE {
+			needTruncate = true
+			log.Error("read len %d not equal to %d, need truncate", n, util.INT32SIZE)
+			err = nil
+			break
+		}
+
+		len, _ := strconv.Atoi(string(buffer))
+		if len == 0 {
+			*nowWriteOffset = nowOffset
+			log.Debug("file end, file id %d offset %d", fileId, nowOffset)
+			break
+		}
+
+		if int64(len) > fileLen || len < util.UINT64SIZE {
+			err = fmt.Errorf("file data len wrong, data len %d filelen %d", len, fileLen)
+			log.Error("%v", err)
+			break
+		}
+
+		buffer = make([]byte, len)
+		n, err = file.Read(buffer)
+		if n != len {
+			needTruncate = true
+			log.Error("read len %d not equal to %d, need truncate", n, len)
+			break
+		}
+
+		var instanceId uint64
+		util.DecodeUint64(buffer, 0, &instanceId)
+
+		if instanceId < *nowInstanceId {
+			log.Error("file data wrong,read instanceid %d smaller than now instanceid %d", instanceId, *nowInstanceId)
+			err = common.ErrInvalidInstanceId
+			break
+		}
+
+		*nowInstanceId = instanceId
+
+		var state common.AcceptorStateData
+		err = proto.Unmarshal(buffer[util.UINT64SIZE:], &state)
+		if err != nil {
+			self.NowFileOffset = uint64(nowOffset)
+			needTruncate = true
+			log.Error("this instance buffer wrong, can't parse to acceptState, instanceid %d bufferlen %d nowoffset %d",
+				instanceId, len-util.UINT64SIZE, nowOffset)
+			err = nil
+			break
+		}
+
+		fileCkSum := util.Crc32(0, buffer, common.CRC32_SKIP)
+		var fileIdstr string
+		self.EncodeFileId(fileId, nowOffset, fileCkSum, &fileIdstr)
+
+		err = db.RebuildOneIndex(instanceId, fileIdstr)
+		if err != nil {
+			break
+		}
+
+		log.Info("rebuild one index ok, fileid %d offset %d instanceid %d cksum %d buffer size %d",
+			fileId, nowOffset, instanceId, fileCkSum, len-util.UINT64SIZE)
+
+		nowOffset += uint64(util.INT32SIZE) + uint64(len)
+	}
+
+	if needTruncate {
+		self.FileLogger.Log("truncate fileid %d offset %d filesize %d", fileId, nowOffset, fileLen)
+		err = os.Truncate(filePath, int64(nowOffset))
+		if err != nil {
+			log.Error("truncate fail, file path %s truncate to length %d error:%v",
+				filePath, nowOffset, err)
+			return err
+		}
+	}
+	return err
 }

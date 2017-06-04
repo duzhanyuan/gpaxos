@@ -1,16 +1,16 @@
 package logstorage
 
 import (
+	"fmt"
 	"syscall"
 
 	"github.com/lichuang/gpaxos/common"
 	"github.com/lichuang/gpaxos/log"
-	"fmt"
 )
 
 type MultiDatabase struct {
 	DbList []*Database
-	DbNum int32
+	DbNum  int32
 }
 
 func (self *MultiDatabase) Init(dbPath string, groupCount int32) error {
@@ -30,17 +30,17 @@ func (self *MultiDatabase) Init(dbPath string, groupCount int32) error {
 	dbPath += "/"
 	self.DbList = make([]*Database, groupCount)
 
-	for i:=0;i<groupCount;++i {
+	for i := 0; int32(i) < groupCount; i++ {
 		groupDbPath := fmt.Sprintf("%sg%d", dbPath, i)
 		db := new(Database)
-		err = db.Init(groupCount, i)
+		err = db.Init(dbPath, int32(i))
 		if err != nil {
 			return err
 		}
 		self.DbList[i] = db
 	}
 
-	self.DbNum = len(self.DbList)
+	self.DbNum = int32(len(self.DbList))
 
 	log.Info("OK, dbpath %s groupcount %d", dbPath, groupCount)
 	return nil

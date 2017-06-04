@@ -12,5 +12,7 @@ var (
 	ErrGetFail           = errors.New("get fail")
 	ErrInvalidGroupIndex = errors.New("invalid group index")
 	ErrInvalidInstanceId = errors.New("invalid instanceid")
+	ErrInvalidMetaFileId = errors.New("invalid meta file id")
+	ErrFileNotExist      = errors.New("file not exist")
 	ErrDbNotInit         = errors.New("db not init yet")
 )
