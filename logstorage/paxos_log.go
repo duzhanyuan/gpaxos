@@ -81,11 +81,19 @@ func (self *PaxosLog) ReadState(groupIdx int32, instanceId uint64, state *common
 	return nil
 }
 
+// common.ErrKeyNotFound or nil
 func (self *PaxosLog) GetMaxInstanceIdFromLog(groupIdx int32, instanceId *uint64) error {
 	err := self.LogStorage.GetMaxInstanceId(groupIdx, instanceId)
 	if err != nil {
+		log.Error("db.getmax fail, groupid:%d error:%v", groupIdx, err)
 		return err
 	}
 
 	return nil
+}
+
+func NewPaxosLog(logStorage logstorage.LogStorage) *PaxosLog {
+    paxosLog := new(PaxosLog)
+    paxosLog.LogStorage = logStorage
+    return paxosLog
 }

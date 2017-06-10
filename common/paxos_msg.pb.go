@@ -9,9 +9,15 @@ It is generated from these files:
 	paxos_msg.proto
 
 It has these top-level messages:
+	Header
+	PaxosMsg
+	CheckpointMsg
 	PaxosNodeInfo
 	SystemVariables
 	AcceptorStateData
+	MasterVariables
+	PaxosValue
+	BatchPaxosValues
 */
 package common
 
@@ -30,6 +36,273 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
+type Header struct {
+	Gid              *uint64 `protobuf:"varint,1,req,name=gid" json:"gid,omitempty"`
+	Rid              *uint64 `protobuf:"varint,2,req,name=rid" json:"rid,omitempty"`
+	Cmdid            *int32  `protobuf:"varint,3,req,name=cmdid" json:"cmdid,omitempty"`
+	Version          *int32  `protobuf:"varint,4,opt,name=version" json:"version,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *Header) Reset()                    { *m = Header{} }
+func (m *Header) String() string            { return proto.CompactTextString(m) }
+func (*Header) ProtoMessage()               {}
+func (*Header) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+func (m *Header) GetGid() uint64 {
+	if m != nil && m.Gid != nil {
+		return *m.Gid
+	}
+	return 0
+}
+
+func (m *Header) GetRid() uint64 {
+	if m != nil && m.Rid != nil {
+		return *m.Rid
+	}
+	return 0
+}
+
+func (m *Header) GetCmdid() int32 {
+	if m != nil && m.Cmdid != nil {
+		return *m.Cmdid
+	}
+	return 0
+}
+
+func (m *Header) GetVersion() int32 {
+	if m != nil && m.Version != nil {
+		return *m.Version
+	}
+	return 0
+}
+
+type PaxosMsg struct {
+	MsgType             *int32  `protobuf:"varint,1,req,name=MsgType" json:"MsgType,omitempty"`
+	InstanceID          *uint64 `protobuf:"varint,2,opt,name=InstanceID" json:"InstanceID,omitempty"`
+	NodeID              *uint64 `protobuf:"varint,3,opt,name=NodeID" json:"NodeID,omitempty"`
+	ProposalID          *uint64 `protobuf:"varint,4,opt,name=ProposalID" json:"ProposalID,omitempty"`
+	ProposalNodeID      *uint64 `protobuf:"varint,5,opt,name=ProposalNodeID" json:"ProposalNodeID,omitempty"`
+	Value               []byte  `protobuf:"bytes,6,opt,name=Value" json:"Value,omitempty"`
+	PreAcceptID         *uint64 `protobuf:"varint,7,opt,name=PreAcceptID" json:"PreAcceptID,omitempty"`
+	PreAcceptNodeID     *uint64 `protobuf:"varint,8,opt,name=PreAcceptNodeID" json:"PreAcceptNodeID,omitempty"`
+	RejectByPromiseID   *uint64 `protobuf:"varint,9,opt,name=RejectByPromiseID" json:"RejectByPromiseID,omitempty"`
+	NowInstanceID       *uint64 `protobuf:"varint,10,opt,name=NowInstanceID" json:"NowInstanceID,omitempty"`
+	MinChosenInstanceID *uint64 `protobuf:"varint,11,opt,name=MinChosenInstanceID" json:"MinChosenInstanceID,omitempty"`
+	LastChecksum        *uint32 `protobuf:"varint,12,opt,name=LastChecksum" json:"LastChecksum,omitempty"`
+	Flag                *uint32 `protobuf:"varint,13,opt,name=Flag" json:"Flag,omitempty"`
+	SystemVariables     []byte  `protobuf:"bytes,14,opt,name=SystemVariables" json:"SystemVariables,omitempty"`
+	MasterVariables     []byte  `protobuf:"bytes,15,opt,name=MasterVariables" json:"MasterVariables,omitempty"`
+	XXX_unrecognized    []byte  `json:"-"`
+}
+
+func (m *PaxosMsg) Reset()                    { *m = PaxosMsg{} }
+func (m *PaxosMsg) String() string            { return proto.CompactTextString(m) }
+func (*PaxosMsg) ProtoMessage()               {}
+func (*PaxosMsg) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+func (m *PaxosMsg) GetMsgType() int32 {
+	if m != nil && m.MsgType != nil {
+		return *m.MsgType
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetInstanceID() uint64 {
+	if m != nil && m.InstanceID != nil {
+		return *m.InstanceID
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetNodeID() uint64 {
+	if m != nil && m.NodeID != nil {
+		return *m.NodeID
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetProposalID() uint64 {
+	if m != nil && m.ProposalID != nil {
+		return *m.ProposalID
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetProposalNodeID() uint64 {
+	if m != nil && m.ProposalNodeID != nil {
+		return *m.ProposalNodeID
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetValue() []byte {
+	if m != nil {
+		return m.Value
+	}
+	return nil
+}
+
+func (m *PaxosMsg) GetPreAcceptID() uint64 {
+	if m != nil && m.PreAcceptID != nil {
+		return *m.PreAcceptID
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetPreAcceptNodeID() uint64 {
+	if m != nil && m.PreAcceptNodeID != nil {
+		return *m.PreAcceptNodeID
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetRejectByPromiseID() uint64 {
+	if m != nil && m.RejectByPromiseID != nil {
+		return *m.RejectByPromiseID
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetNowInstanceID() uint64 {
+	if m != nil && m.NowInstanceID != nil {
+		return *m.NowInstanceID
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetMinChosenInstanceID() uint64 {
+	if m != nil && m.MinChosenInstanceID != nil {
+		return *m.MinChosenInstanceID
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetLastChecksum() uint32 {
+	if m != nil && m.LastChecksum != nil {
+		return *m.LastChecksum
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetFlag() uint32 {
+	if m != nil && m.Flag != nil {
+		return *m.Flag
+	}
+	return 0
+}
+
+func (m *PaxosMsg) GetSystemVariables() []byte {
+	if m != nil {
+		return m.SystemVariables
+	}
+	return nil
+}
+
+func (m *PaxosMsg) GetMasterVariables() []byte {
+	if m != nil {
+		return m.MasterVariables
+	}
+	return nil
+}
+
+type CheckpointMsg struct {
+	MsgType              *int32  `protobuf:"varint,1,req,name=MsgType" json:"MsgType,omitempty"`
+	NodeID               *uint64 `protobuf:"varint,2,req,name=NodeID" json:"NodeID,omitempty"`
+	Flag                 *int32  `protobuf:"varint,3,opt,name=Flag" json:"Flag,omitempty"`
+	UUID                 *uint64 `protobuf:"varint,4,req,name=UUID" json:"UUID,omitempty"`
+	Sequence             *uint64 `protobuf:"varint,5,req,name=Sequence" json:"Sequence,omitempty"`
+	CheckpointInstanceID *uint64 `protobuf:"varint,6,opt,name=CheckpointInstanceID" json:"CheckpointInstanceID,omitempty"`
+	Checksum             *uint32 `protobuf:"varint,7,opt,name=Checksum" json:"Checksum,omitempty"`
+	FilePath             *string `protobuf:"bytes,8,opt,name=FilePath" json:"FilePath,omitempty"`
+	SMID                 *int32  `protobuf:"varint,9,opt,name=SMID" json:"SMID,omitempty"`
+	Offset               *uint64 `protobuf:"varint,10,opt,name=Offset" json:"Offset,omitempty"`
+	Buffer               []byte  `protobuf:"bytes,11,opt,name=Buffer" json:"Buffer,omitempty"`
+	XXX_unrecognized     []byte  `json:"-"`
+}
+
+func (m *CheckpointMsg) Reset()                    { *m = CheckpointMsg{} }
+func (m *CheckpointMsg) String() string            { return proto.CompactTextString(m) }
+func (*CheckpointMsg) ProtoMessage()               {}
+func (*CheckpointMsg) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+
+func (m *CheckpointMsg) GetMsgType() int32 {
+	if m != nil && m.MsgType != nil {
+		return *m.MsgType
+	}
+	return 0
+}
+
+func (m *CheckpointMsg) GetNodeID() uint64 {
+	if m != nil && m.NodeID != nil {
+		return *m.NodeID
+	}
+	return 0
+}
+
+func (m *CheckpointMsg) GetFlag() int32 {
+	if m != nil && m.Flag != nil {
+		return *m.Flag
+	}
+	return 0
+}
+
+func (m *CheckpointMsg) GetUUID() uint64 {
+	if m != nil && m.UUID != nil {
+		return *m.UUID
+	}
+	return 0
+}
+
+func (m *CheckpointMsg) GetSequence() uint64 {
+	if m != nil && m.Sequence != nil {
+		return *m.Sequence
+	}
+	return 0
+}
+
+func (m *CheckpointMsg) GetCheckpointInstanceID() uint64 {
+	if m != nil && m.CheckpointInstanceID != nil {
+		return *m.CheckpointInstanceID
+	}
+	return 0
+}
+
+func (m *CheckpointMsg) GetChecksum() uint32 {
+	if m != nil && m.Checksum != nil {
+		return *m.Checksum
+	}
+	return 0
+}
+
+func (m *CheckpointMsg) GetFilePath() string {
+	if m != nil && m.FilePath != nil {
+		return *m.FilePath
+	}
+	return ""
+}
+
+func (m *CheckpointMsg) GetSMID() int32 {
+	if m != nil && m.SMID != nil {
+		return *m.SMID
+	}
+	return 0
+}
+
+func (m *CheckpointMsg) GetOffset() uint64 {
+	if m != nil && m.Offset != nil {
+		return *m.Offset
+	}
+	return 0
+}
+
+func (m *CheckpointMsg) GetBuffer() []byte {
+	if m != nil {
+		return m.Buffer
+	}
+	return nil
+}
+
 type PaxosNodeInfo struct {
 	Rid              *uint64 `protobuf:"varint,1,req,name=Rid" json:"Rid,omitempty"`
 	Nodeid           *uint64 `protobuf:"varint,2,req,name=Nodeid" json:"Nodeid,omitempty"`
@@ -39,7 +312,7 @@ type PaxosNodeInfo struct {
 func (m *PaxosNodeInfo) Reset()                    { *m = PaxosNodeInfo{} }
 func (m *PaxosNodeInfo) String() string            { return proto.CompactTextString(m) }
 func (*PaxosNodeInfo) ProtoMessage()               {}
-func (*PaxosNodeInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+func (*PaxosNodeInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
 
 func (m *PaxosNodeInfo) GetRid() uint64 {
 	if m != nil && m.Rid != nil {
@@ -65,7 +338,7 @@ type SystemVariables struct {
 func (m *SystemVariables) Reset()                    { *m = SystemVariables{} }
 func (m *SystemVariables) String() string            { return proto.CompactTextString(m) }
 func (*SystemVariables) ProtoMessage()               {}
-func (*SystemVariables) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+func (*SystemVariables) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
 
 func (m *SystemVariables) GetGid() uint64 {
 	if m != nil && m.Gid != nil {
@@ -102,7 +375,7 @@ type AcceptorStateData struct {
 func (m *AcceptorStateData) Reset()                    { *m = AcceptorStateData{} }
 func (m *AcceptorStateData) String() string            { return proto.CompactTextString(m) }
 func (*AcceptorStateData) ProtoMessage()               {}
-func (*AcceptorStateData) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+func (*AcceptorStateData) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
 
 func (m *AcceptorStateData) GetInstanceID() uint64 {
 	if m != nil && m.InstanceID != nil {
@@ -153,30 +426,133 @@ func (m *AcceptorStateData) GetChecksum() uint32 {
 	return 0
 }
 
+type MasterVariables struct {
+	MasterNodeid     *uint64 `protobuf:"varint,1,req,name=MasterNodeid" json:"MasterNodeid,omitempty"`
+	Version          *uint64 `protobuf:"varint,2,req,name=Version" json:"Version,omitempty"`
+	LeaseTime        *uint32 `protobuf:"varint,3,req,name=LeaseTime" json:"LeaseTime,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *MasterVariables) Reset()                    { *m = MasterVariables{} }
+func (m *MasterVariables) String() string            { return proto.CompactTextString(m) }
+func (*MasterVariables) ProtoMessage()               {}
+func (*MasterVariables) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{6} }
+
+func (m *MasterVariables) GetMasterNodeid() uint64 {
+	if m != nil && m.MasterNodeid != nil {
+		return *m.MasterNodeid
+	}
+	return 0
+}
+
+func (m *MasterVariables) GetVersion() uint64 {
+	if m != nil && m.Version != nil {
+		return *m.Version
+	}
+	return 0
+}
+
+func (m *MasterVariables) GetLeaseTime() uint32 {
+	if m != nil && m.LeaseTime != nil {
+		return *m.LeaseTime
+	}
+	return 0
+}
+
+type PaxosValue struct {
+	SMID             *int32 `protobuf:"varint,1,req,name=SMID" json:"SMID,omitempty"`
+	Value            []byte `protobuf:"bytes,2,req,name=Value" json:"Value,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *PaxosValue) Reset()                    { *m = PaxosValue{} }
+func (m *PaxosValue) String() string            { return proto.CompactTextString(m) }
+func (*PaxosValue) ProtoMessage()               {}
+func (*PaxosValue) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{7} }
+
+func (m *PaxosValue) GetSMID() int32 {
+	if m != nil && m.SMID != nil {
+		return *m.SMID
+	}
+	return 0
+}
+
+func (m *PaxosValue) GetValue() []byte {
+	if m != nil {
+		return m.Value
+	}
+	return nil
+}
+
+type BatchPaxosValues struct {
+	Values           []*PaxosValue `protobuf:"bytes,1,rep,name=Values" json:"Values,omitempty"`
+	XXX_unrecognized []byte        `json:"-"`
+}
+
+func (m *BatchPaxosValues) Reset()                    { *m = BatchPaxosValues{} }
+func (m *BatchPaxosValues) String() string            { return proto.CompactTextString(m) }
+func (*BatchPaxosValues) ProtoMessage()               {}
+func (*BatchPaxosValues) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{8} }
+
+func (m *BatchPaxosValues) GetValues() []*PaxosValue {
+	if m != nil {
+		return m.Values
+	}
+	return nil
+}
+
 func init() {
+	proto.RegisterType((*Header)(nil), "common.Header")
+	proto.RegisterType((*PaxosMsg)(nil), "common.PaxosMsg")
+	proto.RegisterType((*CheckpointMsg)(nil), "common.CheckpointMsg")
 	proto.RegisterType((*PaxosNodeInfo)(nil), "common.PaxosNodeInfo")
 	proto.RegisterType((*SystemVariables)(nil), "common.SystemVariables")
 	proto.RegisterType((*AcceptorStateData)(nil), "common.AcceptorStateData")
+	proto.RegisterType((*MasterVariables)(nil), "common.MasterVariables")
+	proto.RegisterType((*PaxosValue)(nil), "common.PaxosValue")
+	proto.RegisterType((*BatchPaxosValues)(nil), "common.BatchPaxosValues")
 }
 
 func init() { proto.RegisterFile("paxos_msg.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 256 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x54, 0x8e, 0xcd, 0x4a, 0xc3, 0x40,
-	0x14, 0x85, 0x69, 0x52, 0x53, 0xbd, 0x35, 0x8d, 0x1d, 0xa8, 0xcc, 0x32, 0x74, 0x15, 0x41, 0xb2,
-	0xf0, 0x0d, 0xc4, 0x80, 0x64, 0xa1, 0x14, 0x03, 0x59, 0xb8, 0x91, 0x69, 0x72, 0xb5, 0x83, 0x9d,
-	0xb9, 0x61, 0x66, 0x0a, 0xfa, 0x42, 0x3e, 0xa7, 0x4c, 0x7e, 0x04, 0x97, 0xf3, 0x9d, 0x33, 0xe7,
-	0xbb, 0x90, 0x74, 0xe2, 0x8b, 0xec, 0x9b, 0xb2, 0x1f, 0x79, 0x67, 0xc8, 0x11, 0x8b, 0x1a, 0x52,
-	0x8a, 0xf4, 0xf6, 0x16, 0xe2, 0x9d, 0x8f, 0x9e, 0xa9, 0xc5, 0x52, 0xbf, 0x13, 0x5b, 0x42, 0xf8,
-	0x22, 0x5b, 0x3e, 0x4b, 0x83, 0x6c, 0xce, 0x56, 0x10, 0xf9, 0x40, 0xb6, 0x3c, 0xf0, 0xef, 0xed,
-	0x2b, 0x24, 0xd5, 0xb7, 0x75, 0xa8, 0x6a, 0x61, 0xa4, 0xd8, 0x1f, 0xd1, 0xfa, 0xfe, 0xe3, 0x5f,
-	0xff, 0x06, 0xe0, 0x09, 0xd5, 0x1e, 0x4d, 0x75, 0x90, 0x1d, 0x0f, 0xd2, 0x30, 0x5b, 0xde, 0x6d,
-	0xf2, 0x41, 0x95, 0xff, 0xf7, 0x24, 0xb0, 0xa8, 0xd1, 0x58, 0x49, 0x9a, 0x87, 0xfd, 0xf6, 0xcf,
-	0x0c, 0xd6, 0xf7, 0x4d, 0x83, 0x9d, 0x23, 0x53, 0x39, 0xe1, 0xb0, 0x10, 0x4e, 0x30, 0x06, 0x50,
-	0x6a, 0xeb, 0x84, 0x6e, 0xb0, 0x2c, 0x46, 0xcb, 0x1a, 0x2e, 0x76, 0x86, 0x94, 0xb4, 0x1e, 0xf5,
-	0x87, 0xb1, 0x0d, 0xc4, 0x23, 0xea, 0x05, 0xc5, 0xb0, 0xe9, 0x7f, 0x0f, 0x93, 0xd8, 0x96, 0x05,
-	0x9f, 0xf7, 0xec, 0x1a, 0x56, 0x13, 0x1b, 0xbb, 0x67, 0xd3, 0xc4, 0xc4, 0x6b, 0x71, 0x3c, 0x21,
-	0x8f, 0xd2, 0x20, 0xbb, 0x64, 0x57, 0x70, 0xfe, 0x70, 0xc0, 0xe6, 0xd3, 0x9e, 0x14, 0x5f, 0xa4,
-	0x41, 0x16, 0xff, 0x06, 0x00, 0x00, 0xff, 0xff, 0x5b, 0x68, 0x8b, 0x45, 0x4c, 0x01, 0x00, 0x00,
+	// 603 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x53, 0x4d, 0x6f, 0xd3, 0x40,
+	0x10, 0x95, 0x9d, 0x38, 0x49, 0x27, 0x76, 0x9c, 0xba, 0x5f, 0x8b, 0xe0, 0x60, 0xf9, 0xe4, 0x4a,
+	0xa8, 0x07, 0x0e, 0xdc, 0x49, 0xa3, 0x42, 0x44, 0x53, 0xa2, 0xa6, 0xed, 0x81, 0x0b, 0xda, 0xda,
+	0x93, 0xc4, 0x10, 0x7b, 0x8d, 0x77, 0x03, 0xf4, 0x0f, 0xf1, 0x6f, 0xe0, 0x37, 0xa1, 0x1d, 0x7f,
+	0x24, 0x6d, 0xb9, 0x65, 0xde, 0x1b, 0xbf, 0x99, 0x79, 0xfb, 0x02, 0x6e, 0xce, 0x7f, 0x09, 0xf9,
+	0x25, 0x95, 0xcb, 0xb3, 0xbc, 0x10, 0x4a, 0x78, 0x9d, 0x48, 0xa4, 0xa9, 0xc8, 0x82, 0x11, 0x74,
+	0x3e, 0x20, 0x8f, 0xb1, 0xf0, 0xfa, 0xd0, 0x5a, 0x26, 0x31, 0x33, 0x7c, 0x33, 0x6c, 0xeb, 0xa2,
+	0x48, 0x62, 0x66, 0x52, 0xe1, 0x80, 0x15, 0xa5, 0x71, 0x12, 0xb3, 0x96, 0x6f, 0x86, 0x96, 0xe7,
+	0x42, 0xf7, 0x07, 0x16, 0x32, 0x11, 0x19, 0x6b, 0xfb, 0x46, 0x68, 0x05, 0x7f, 0x4c, 0xe8, 0xcd,
+	0xb4, 0xfe, 0x54, 0x2e, 0x35, 0x3b, 0x95, 0xcb, 0x9b, 0x87, 0x1c, 0x49, 0xca, 0xf2, 0x3c, 0x80,
+	0x49, 0x26, 0x15, 0xcf, 0x22, 0x9c, 0x8c, 0x99, 0xe9, 0x1b, 0x61, 0xdb, 0x1b, 0x40, 0xe7, 0x4a,
+	0xc4, 0xba, 0x6e, 0x51, 0xed, 0x01, 0xcc, 0x0a, 0x91, 0x0b, 0xc9, 0xd7, 0x93, 0x31, 0xa9, 0xb6,
+	0xbd, 0x63, 0x18, 0xd4, 0x58, 0xd5, 0x6b, 0x11, 0xee, 0x80, 0x75, 0xc7, 0xd7, 0x1b, 0x64, 0x1d,
+	0xdf, 0x08, 0x6d, 0xef, 0x00, 0xfa, 0xb3, 0x02, 0xdf, 0x45, 0x11, 0xe6, 0x6a, 0x32, 0x66, 0x5d,
+	0xea, 0x39, 0x01, 0xb7, 0x01, 0xab, 0x8f, 0x7b, 0x44, 0xbc, 0x80, 0xfd, 0x6b, 0xfc, 0x8a, 0x91,
+	0x1a, 0x3d, 0xcc, 0x0a, 0x91, 0x26, 0x52, 0x53, 0x7b, 0x44, 0x1d, 0x81, 0x73, 0x25, 0x7e, 0xee,
+	0xac, 0x0a, 0x04, 0xbf, 0x84, 0x83, 0x69, 0x92, 0x9d, 0xaf, 0x84, 0xc4, 0x6c, 0x87, 0xec, 0x13,
+	0x79, 0x08, 0xf6, 0x25, 0x97, 0xea, 0x7c, 0x85, 0xd1, 0x37, 0xb9, 0x49, 0x99, 0xed, 0x1b, 0xa1,
+	0xe3, 0xd9, 0xd0, 0xbe, 0x58, 0xf3, 0x25, 0x73, 0xa8, 0x3a, 0x01, 0x77, 0xfe, 0x20, 0x15, 0xa6,
+	0x77, 0xbc, 0x48, 0xf8, 0xfd, 0x1a, 0x25, 0x1b, 0xd0, 0xe6, 0x27, 0xe0, 0x4e, 0xb9, 0x54, 0x58,
+	0x6c, 0x09, 0x57, 0x13, 0xc1, 0x5f, 0x03, 0x1c, 0x92, 0xcc, 0x45, 0x92, 0xa9, 0xff, 0x9a, 0xba,
+	0x35, 0xb0, 0x7c, 0xa2, 0x7a, 0xa4, 0xb6, 0xd3, 0xd2, 0xd5, 0xed, 0x2d, 0x19, 0xa9, 0xb9, 0x21,
+	0xf4, 0xe6, 0xf8, 0x7d, 0x83, 0x59, 0x84, 0xcc, 0x22, 0xe4, 0x15, 0x1c, 0x6e, 0xf5, 0x77, 0x8e,
+	0xea, 0xd0, 0x51, 0x43, 0xe8, 0x35, 0x07, 0x75, 0xe9, 0x84, 0x21, 0xf4, 0x2e, 0x92, 0x35, 0xce,
+	0xb8, 0x5a, 0x91, 0x8f, 0x7b, 0x7a, 0xc2, 0x7c, 0x5a, 0x59, 0x47, 0xdb, 0x7c, 0x5a, 0x2c, 0x24,
+	0xaa, 0xca, 0xb3, 0x01, 0x74, 0x46, 0x9b, 0xc5, 0x02, 0x0b, 0xb2, 0xc9, 0x0e, 0x5e, 0x83, 0x43,
+	0xf9, 0xa0, 0x95, 0xb3, 0x85, 0xd0, 0xf1, 0xba, 0x6e, 0xb2, 0x56, 0xdd, 0x52, 0xc7, 0x2d, 0xf8,
+	0xfc, 0xcc, 0x30, 0xdd, 0xff, 0xbe, 0xe9, 0x3f, 0x05, 0x98, 0x62, 0x7a, 0x8f, 0xc5, 0x7c, 0x95,
+	0xe4, 0xcc, 0xf4, 0x5b, 0x61, 0xff, 0xcd, 0xd1, 0x59, 0x99, 0xe7, 0xb3, 0xc7, 0x73, 0x5c, 0xe8,
+	0xde, 0x55, 0x51, 0x6d, 0x91, 0xf6, 0x6f, 0x03, 0xf6, 0xcb, 0x58, 0x88, 0x62, 0xae, 0xb8, 0xc2,
+	0x31, 0x57, 0xfc, 0x49, 0x44, 0xcb, 0x29, 0xfb, 0xb0, 0xb7, 0x4d, 0x48, 0x69, 0xf2, 0x11, 0x38,
+	0x15, 0xd4, 0x84, 0xd7, 0x2c, 0xc3, 0x5b, 0x4a, 0x62, 0xdc, 0x78, 0x7e, 0x0c, 0x83, 0x1a, 0x6b,
+	0xc2, 0x5b, 0x49, 0xd4, 0x78, 0x1d, 0x62, 0x33, 0xb4, 0x9f, 0x58, 0x6e, 0x86, 0x4e, 0xf0, 0xf1,
+	0x59, 0x38, 0x74, 0xd8, 0x4a, 0xa8, 0x72, 0xab, 0xdc, 0x73, 0xe7, 0x44, 0xb3, 0x5e, 0xfc, 0x12,
+	0xb9, 0xc4, 0x9b, 0x24, 0x45, 0xda, 0xd0, 0x09, 0x4e, 0x01, 0xc8, 0x17, 0x1a, 0xd9, 0xbc, 0x5d,
+	0x99, 0xa4, 0xe6, 0xef, 0xa4, 0xbf, 0xb6, 0x83, 0xb7, 0x30, 0x1c, 0x71, 0x15, 0xad, 0xb6, 0xfd,
+	0xd2, 0x0b, 0xa0, 0x53, 0xfe, 0x62, 0x06, 0x99, 0xed, 0x3d, 0x32, 0x9b, 0xa8, 0x7f, 0x01, 0x00,
+	0x00, 0xff, 0xff, 0x0a, 0xa8, 0x9e, 0x96, 0x61, 0x04, 0x00, 0x00,
 }

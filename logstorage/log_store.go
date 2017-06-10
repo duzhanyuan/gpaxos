@@ -115,7 +115,7 @@ func (self *LogStore) Init(path string, groupIdx int32, db *Database) error {
 		return err
 	}
 
-	err = self.ExpendFile(self.File, &self.NowFileSize)
+	err = self.expendFile(self.File, &self.NowFileSize)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (self *LogStore) Init(path string, groupIdx int32, db *Database) error {
 	return nil
 }
 
-func (self *LogStore) ExpendFile(file *os.File, fileSize *uint64) error {
+func (self *LogStore) expendFile(file *os.File, fileSize *uint64) error {
 	var err error
 	var size int64
 	size, err = file.Seek(0, os.SEEK_END)
@@ -239,7 +239,7 @@ func (self *LogStore) DeleteFile(fileId int32) error {
 	return err
 }
 
-func (self *LogStore) GetFileId(needWriteSize uint32, fileId *int32, offset *uint32) error {
+func (self *LogStore) getFileId(needWriteSize uint32, fileId *int32, offset *uint32) error {
 	var err error
 	if self.File == nil {
 		err = fmt.Errorf("file already broken, file id %d", self.FileId)
@@ -278,7 +278,7 @@ func (self *LogStore) GetFileId(needWriteSize uint32, fileId *int32, offset *uin
 		}
 		*offset = uint32(ret)
 
-		err = self.ExpendFile(self.File, &self.NowFileSize)
+		err = self.expendFile(self.File, &self.NowFileSize)
 		if err != nil {
 			err = fmt.Errorf("new file expand fail, file id %d", self.FileId)
 			self.FileLogger.Log("new file expand file fail, now file id %d", self.FileId)
@@ -306,7 +306,7 @@ func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer str
 
 	var fileId int32
 	var offset uint32
-	err := self.GetFileId(uint32(tmpBufLen), &fileId, &offset)
+	err := self.getFileId(uint32(tmpBufLen), &fileId, &offset)
 	if err != nil {
 		return err
 	}

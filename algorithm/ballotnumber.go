@@ -1,12 +1,8 @@
 package algorithm
 
-import (
-	"github.com/lichuang/gpaxos/common"
-)
-
 type BallotNumber struct {
-	proposalId uint64
-	nodeId     common.NodeId
+    proposalId uint64
+    nodeId     uint64
 }
 
 func (bn *BallotNumber) BE(other *BallotNumber) bool {

@@ -2,6 +2,7 @@ package util
 
 import (
 	"testing"
+    "fmt"
 )
 
 func Test_binary(t *testing.T) {
@@ -30,4 +31,12 @@ func Test_binary(t *testing.T) {
 	if u64 != 111 {
 		t.Errorf("uint64 decode error:%d\n", u64)
 	}
+}
+
+func Test_Bytes(t *testing.T) {
+    var str string =  "abc";
+    buf := []byte(str);
+    fmt.Printf("buf:%s\n", string(buf))
+    buf = AppendBytes(buf, buf, buf)
+    fmt.Printf("buf:%s\n", string(buf))
 }

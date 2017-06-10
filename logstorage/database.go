@@ -20,7 +20,7 @@ const SYSTEMVARIABLES_KEY = math.MaxUint64 - 1
 const MASTERVARIABLES_KEY = math.MaxUint64 - 2
 
 type WriteOptions struct {
-	sync bool
+	Sync bool
 }
 
 type Database struct {
@@ -212,7 +212,7 @@ func (self *Database) Get(instanceId uint64, value *string) error {
 	return nil
 }
 
-func (self *Database) ValueToFileId(options WriteOptions, instanceId uint64, value string, fileId *string) error {
+func (self *Database) valueToFileId(options WriteOptions, instanceId uint64, value string, fileId *string) error {
 	err := self.valueStore.Append(options, instanceId, value, fileId)
 	if err != nil {
 		log.Error("append fail:%v", err)
@@ -255,7 +255,7 @@ func (self *Database) Put(options WriteOptions, instanceId uint64, value string)
 	}
 
 	var fileId string
-	err = self.ValueToFileId(options, instanceId, value, &fileId)
+	err = self.valueToFileId(options, instanceId, value, &fileId)
 	if err != nil {
 		return err
 	}

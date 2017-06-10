@@ -1,6 +1,7 @@
 package util
 
 import (
+    "bytes"
 	"encoding/binary"
 )
 
@@ -27,4 +28,16 @@ func DecodeUint32(buffer []byte, offset int, ret *uint32) {
 
 func EncodeUint32(buffer []byte, offset int, ret uint32) {
 	binary.LittleEndian.PutUint32(buffer[offset:], ret)
+}
+
+func DecodeUint16(buffer []byte, offset int, ret *uint16) {
+    *ret = binary.LittleEndian.Uint16(buffer[offset:])
+}
+
+func EncodeUint16(buffer []byte, offset int, ret uint16) {
+    binary.LittleEndian.PutUint16(buffer[offset:], ret)
+}
+
+func AppendBytes(inputs ...[]byte)[] byte {
+    return bytes.Join(inputs, []byte(""))
 }
