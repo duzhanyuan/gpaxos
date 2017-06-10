@@ -20,3 +20,7 @@ func NewInstance(config *config.Config, logStorage logstorage.LogStorage,
 func (self *Instance)GetLastChecksum() uint32 {
     return 0
 }
+
+func (self *Instance) OnReceivePaxosMsg(msg common.PaxosMsg) error {
+    return nil
+}

@@ -7,6 +7,8 @@ const (
     NET_CRC32SKIP = 7
 )
 
+const Version = 1
+
 // error code
 var (
 	ErrKeyNotFound       = errors.New("key not found")
@@ -14,6 +16,7 @@ var (
 	ErrInvalidGroupIndex = errors.New("invalid group index")
 	ErrInvalidInstanceId = errors.New("invalid instanceid")
 	ErrInvalidMetaFileId = errors.New("invalid meta file id")
+    ErrInvalidMsg        = errors.New("invalid msg")
 	ErrFileNotExist      = errors.New("file not exist")
 	ErrDbNotInit         = errors.New("db not init yet")
 )
