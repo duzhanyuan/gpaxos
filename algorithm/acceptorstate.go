@@ -18,7 +18,7 @@ type AcceptorState struct {
 	SyncTimes   int32
 }
 
-func NewAcceptorState(config *config.Config, logStorage logstorage.LogStorage) *AcceptorState {
+func newAcceptorState(config *config.Config, logStorage logstorage.LogStorage) *AcceptorState {
 	acceptorState := new(AcceptorState)
 	acceptorState.Config = config
 	acceptorState.PaxosLog = logstorage.NewPaxosLog(logStorage)

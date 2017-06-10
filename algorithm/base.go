@@ -33,12 +33,16 @@ func init() {
     CHECKSUM_LEN = int32(util.UINT32SIZE)
 }
 
-func (self *Base) initBase(config *config.Config, transport common.MsgTransport, instance *Instance) {
-    self.config = config
-    self.transport = transport
-    self.instance = instance
-    self.instanceId = 0
-    self.isTestNode = false
+func newBase(config *config.Config, transport common.MsgTransport, instance *Instance) *Base{
+    base := new(Base)
+
+    base.config = config
+    base.transport = transport
+    base.instance = instance
+    base.instanceId = 0
+    base.isTestNode = false
+
+    return base
 }
 
 func (self *Base) GetInstanceId() uint64 {
@@ -49,7 +53,7 @@ func (self *Base) SetInstanceId(instanceId uint64) {
     self.instanceId = instanceId
 }
 
-func (self *Base) NewInstanceId() {
+func (self *Base) NewInstance() {
     self.instanceId++
 }
 
