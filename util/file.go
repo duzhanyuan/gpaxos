@@ -1,9 +1,9 @@
 package util
 
 import (
-	"os"
+  "os"
 )
 
 func DeleteDir(path string) error {
-	return os.RemoveAll(path)
+  return os.RemoveAll(path)
 }
