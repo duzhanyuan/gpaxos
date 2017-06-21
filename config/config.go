@@ -22,3 +22,11 @@ func (self *Config) GetGid() uint64 {
 func (self *Config) GetMyNodeId() uint64 {
   return 0
 }
+
+func (self *Config) GetMajorityCount() int {
+  return 0
+}
+
+func (self *Config) GetNodeCount() int {
+  return 0
+}
