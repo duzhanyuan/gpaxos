@@ -1,6 +1,8 @@
 package common
 
-import "github.com/syndtr/goleveldb/leveldb/errors"
+import (
+  "github.com/syndtr/goleveldb/leveldb/errors"
+)
 
 const (
   CRC32_SKIP    = 8
@@ -41,3 +43,12 @@ const (
   MsgType_PaxosLearner_AskforCheckpoint    = 12
   MsgType_PaxosLearner_OnAskforCheckpoint  = 13
 )
+
+const (
+  Timer_Proposer_Prepare_Timeout = 1
+  Timer_Proposer_Accept_Timeout  = 2
+  Timer_Learner_Askforlearn_noop = 3
+  Timer_Instance_Commit_Timeout  = 4
+)
+
+var INVALID_INSTANCEID uint64 = uint64(-1)

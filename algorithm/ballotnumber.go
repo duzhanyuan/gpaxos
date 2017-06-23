@@ -5,8 +5,8 @@ type BallotNumber struct {
   nodeId     uint64
 }
 
-func newBallotNumber(proposalId uint64, nodeId uint64) *BallotNumber {
-  return &BallotNumber{
+func newBallotNumber(proposalId uint64, nodeId uint64) BallotNumber {
+  return BallotNumber{
     proposalId: proposalId,
     nodeId:     nodeId,
   }

@@ -36,3 +36,23 @@ func GetMaxRetryQueueLen() int {
 func GetLogFileMaxSize() int64 {
   return 10240
 }
+
+func GetStartPrepareTimeoutMs() uint32 {
+  return  1000
+}
+
+func GetStartAcceptTimeoutMs() uint32 {
+  return 1000
+}
+
+func GetMaxPrepareTimeoutMs() uint32 {
+  return 5000
+}
+
+func GetMaxAcceptTimeoutMs() uint32 {
+  return 5000
+}
+
+func GetCleanerDeleteQps() uint32 {
+  return 1000
+}

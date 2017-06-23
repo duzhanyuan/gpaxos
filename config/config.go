@@ -11,7 +11,7 @@ func (self *Config) SyncInterval() int32 {
   return 5
 }
 
-func (self *Config) GetMyGroupId() int32 {
+func (self *Config) GetMyGroupIdx() int32 {
   return 0
 }
 

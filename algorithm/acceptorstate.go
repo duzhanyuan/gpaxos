@@ -91,21 +91,21 @@ func (self *AcceptorState) Persist(instanceid uint64, lastCheckSum uint32) error
     }
   }
 
-  err := self.PaxosLog.WriteState(options, self.Config.GetMyGroupId(), instanceid, state)
+  err := self.PaxosLog.WriteState(options, self.Config.GetMyGroupIdx(), instanceid, state)
   if err != nil {
     return err
   }
 
   log.Info("Groupidx %d instanceid %d promiseid %d promisenodeid %d "+
     "acceptedid %d acceptednodeid %d valuelen %d cksum %d",
-    self.Config.GetMyGroupId, instanceid, self.PromiseNum.proposalId,
+    self.Config.GetMyGroupIdx, instanceid, self.PromiseNum.proposalId,
     self.PromiseNum.nodeId, self.AcceptedNum.proposalId, self.AcceptedNum.nodeId,
     len(self.AcceptValue), self.CheckSum)
   return nil
 }
 
 func (self *AcceptorState) Load(instanceid *uint64) error {
-  groupId := self.Config.GetMyGroupId()
+  groupId := self.Config.GetMyGroupIdx()
 
   err := self.PaxosLog.GetMaxInstanceIdFromLog(groupId, instanceid)
   if err != nil {
@@ -129,7 +129,7 @@ func (self *AcceptorState) Load(instanceid *uint64) error {
 
   log.Info("Groupidx %d instanceid %d promiseid %d promisenodeid %d "+
     "acceptedid %d acceptednodeid %d valuelen %d cksum %d",
-    self.Config.GetMyGroupId, instanceid, self.PromiseNum.proposalId,
+    self.Config.GetMyGroupIdx, instanceid, self.PromiseNum.proposalId,
     self.PromiseNum.nodeId, self.AcceptedNum.proposalId, self.AcceptedNum.nodeId,
     len(self.AcceptValue), self.CheckSum)
   return nil

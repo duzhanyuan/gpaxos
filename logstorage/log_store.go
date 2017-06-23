@@ -29,7 +29,7 @@ func (self *fileLogger) Log(format string, args ...interface{}) {
     return
   }
 
-  nowTimeMs := time.Now().UnixNano() / 1000000
+  nowTimeMs := util.NowTimeMs()
   timePrefix := time.Now().Format("2006-01-02 15:04:05")
 
   prefix := fmt.Sprintf("%s:%d", timePrefix, nowTimeMs%1000)
@@ -295,7 +295,7 @@ func (self *LogStore) getFileId(needWriteSize uint32, fileId *int32, offset *uin
 }
 
 func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer string, fileIdStr *string) error {
-  begin := time.Now().UnixNano()
+  begin := util.NowTimeMs()
 
   self.Mutex.Lock()
   defer self.Mutex.Unlock()
@@ -332,14 +332,14 @@ func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer str
   ckSum := util.Crc32(0, tmpBuf[util.INT32SIZE:], common.CRC32_SKIP)
   self.EncodeFileId(fileId, uint64(offset), ckSum, fileIdStr)
 
-  useMs := (time.Now().UnixNano() - begin) / 1000000
+  useMs := (util.NowTimeMs() - begin) / 1000000
 
   log.Info("ok, offset %d fileid %d cksum %d instanceid %d buffersize %d usetime %d ms sync %d",
     offset, fileId, ckSum, instanceId, useMs, bufferLen)
   return nil
 }
 
-func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *string) error {
+func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer []byte) error {
   var fileId int32
   var offset uint64
   var cksum uint32

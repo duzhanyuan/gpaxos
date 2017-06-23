@@ -2,6 +2,7 @@ package util
 
 import (
   "github.com/emirpasic/gods/trees/binaryheap"
+  "github.com/lichuang/gpaxos/util"
 )
 
 type TimeManager struct {
@@ -40,7 +41,7 @@ func (self *TimeManager)GetNextTimeout() int32 {
   }
 
   timer := obj.(*Timer)
-  nowTime := GetSteadyClockMS()
+  nowTime := util.NowTimeMs()
   if timer.AbsTime > nowTime {
     nextTimeout = int32(timer.AbsTime - nowTime)
   }
@@ -59,7 +60,7 @@ func (self *TimeManager) PopTimeout(timerId *uint32, timerType *int) bool {
   }
 
   timer := obj.(*Timer)
-  nowTime := GetSteadyClockMS()
+  nowTime := util.
   if timer.AbsTime > nowTime {
     return false
   }

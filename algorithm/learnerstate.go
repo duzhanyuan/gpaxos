@@ -60,7 +60,7 @@ func (self *LearnerState) LearnValue(instanceId uint64, learnedBallot BallotNumb
     Sync: false,
   }
 
-  err := self.PaxosLog.WriteState(options, self.Config.GetMyGroupId(), instanceId, state)
+  err := self.PaxosLog.WriteState(options, self.Config.GetMyGroupIdx(), instanceId, state)
   if err != nil {
     log.Error("logstorage writestate fail, instanceid %d valuelen %d err %v",
       instanceId, len(value), err)

@@ -67,7 +67,7 @@ func (self *Database) ClearAllLog() error {
   }
 
   options := WriteOptions{
-    sync: true,
+    Sync: true,
   }
   if len(sysVarbuffer) > 0 {
     err = self.SetSystemVariables(options, sysVarbuffer)
@@ -184,7 +184,7 @@ func (self *Database) GetFromLevelDb(instanceId uint64, value *[]byte) error {
   return nil
 }
 
-func (self *Database) Get(instanceId uint64, value *string) error {
+func (self *Database) Get(instanceId uint64, value []byte) error {
   var err error
 
   if !self.hasInit {
@@ -220,7 +220,7 @@ func (self *Database) valueToFileId(options WriteOptions, instanceId uint64, val
   return err
 }
 
-func (self *Database) FileIdToValue(fileId string, instanceId *uint64, value *string) error {
+func (self *Database) FileIdToValue(fileId string, instanceId *uint64, value []byte) error {
   err := self.valueStore.Read(fileId, instanceId, value)
   if err != nil {
     log.Error("fail, ret %v", err)
@@ -286,7 +286,7 @@ func (self *Database) ForceDel(options WriteOptions, instanceId uint64) error {
   }
 
   writeOptions := opt.WriteOptions{
-    Sync: options.sync,
+    Sync: options.Sync,
   }
   err = self.leveldb.Delete([]byte(key), &writeOptions)
   if err != nil {
@@ -322,7 +322,7 @@ func (self *Database) Del(options WriteOptions, instanceId uint64) error {
 
   }
   writeOptions := opt.WriteOptions{
-    Sync: options.sync,
+    Sync: options.Sync,
   }
   err := self.leveldb.Delete([]byte(key), &writeOptions)
   if err != nil {

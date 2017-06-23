@@ -33,16 +33,14 @@ func init() {
   CHECKSUM_LEN = int32(util.UINT32SIZE)
 }
 
-func newBase(config *config.Config, transport common.MsgTransport, instance *Instance) *Base {
-  base := new(Base)
-
-  base.config = config
-  base.transport = transport
-  base.instance = instance
-  base.instanceId = 0
-  base.isTestNode = false
-
-  return base
+func newBase(config *config.Config, transport *common.MsgTransport, instance *Instance) Base {
+  return Base{
+    config:config,
+    transport:transport,
+    instance:instance,
+    instanceId:0,
+    isTestNode:false,
+  }
 }
 
 func (self *Base) GetInstanceId() uint64 {
@@ -82,7 +80,7 @@ func (self *Base) PackCheckpointMsg(msg common.CheckpointMsg, buffer []byte) err
 }
 
 func (self *Base) PackBaseMsg(body []byte, cmd int32, buffer []byte) error {
-  groupIdx := self.config.GetMyGroupId()
+  groupIdx := self.config.GetMyGroupIdx()
   groupIdBuf := make([]byte, GROUPIDXLEN)
   util.EncodeInt32(groupIdBuf, 0, groupIdx)
 

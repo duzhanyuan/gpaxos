@@ -139,12 +139,12 @@ func (self *IOThread) DealWithRetry() {
   }
 }
 
-func (self *IOThread) AddTimer(timeout uint64, timerType int) uint32 {
+func (self *IOThread) AddTimer(timeout uint32, timerType int) uint32 {
   if timeout == -1 {
     return -1
   }
 
-  absTime := util.GetSteadyClockMS() + timeout
+  absTime := util.NowTimeMs() + uint64(timeout)
   timer := self.TimerMng.AddTimerWithType(absTime, timerType)
   self.TimerIdMap[timer.TimerId] = true
 

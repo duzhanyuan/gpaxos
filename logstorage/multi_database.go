@@ -54,7 +54,7 @@ func (self *MultiDatabase) GetLogStorageDirPath(groupIdx int32) string {
   return self.DbList[groupIdx].GetDBPath()
 }
 
-func (self *MultiDatabase) Get(groupIdx int32, instanceId uint64, value *string) error {
+func (self *MultiDatabase) Get(groupIdx int32, instanceId uint64, value []byte) error {
   if groupIdx >= self.DbNum {
     return common.ErrInvalidGroupIndex
   }
