@@ -62,7 +62,7 @@ func (self *PaxosLog) WriteState(options WriteOptions, groupIdx int32, instanceI
 
 func (self *PaxosLog) ReadState(groupIdx int32, instanceId uint64, state *common.AcceptorStateData) error {
   var buf []byte
-  err := self.LogStorage.Get(groupIdx, instanceId, &buf)
+  err := self.LogStorage.Get(groupIdx, instanceId, buf)
   if err != nil {
     log.Error("DB.Get fail,groupidx %d error %v", groupIdx, err)
     return err

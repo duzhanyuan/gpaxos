@@ -52,3 +52,4 @@ const (
 )
 
 var INVALID_INSTANCEID uint64 = uint64(-1)
+var NULL_NODEID uint64 = uint64(-1)

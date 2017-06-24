@@ -24,7 +24,7 @@ type CheckpointManager struct {
 }
 
 func NewCheckpointManager(config *config.Config, factory *sm_base.StateMachineFactory,
-  storage logstorage.LogStorage, useReplayer bool) *CheckpointManager {
+  storage *logstorage.LogStorage, useReplayer bool) *CheckpointManager {
   mng := &CheckpointManager{
     Config:                config,
     LogStorage:            storage,
@@ -80,12 +80,44 @@ func (self *CheckpointManager) PrepareForAskforCheckpoint(sendNodeId uint64) err
     if len(self.NeedAskNodes) < self.Config.GetMajorityCount() {
       log.Info("Need more other tell us need to ask for checkpoint")
 
-      return errors.New("")
+      return errors.New("Need more other tell us need to ask for checkpoint")
     }
   }
 
   self.LastAskforCheckpointTime = 0
   self.InAskforCheckpointMode = true
+
+  return nil
+}
+
+func (self *CheckpointManager) InAskforcheckpointMode() bool {
+  return self.InAskforCheckpointMode
+}
+
+func (self *CheckpointManager) ExitCheckpointMode() {
+  self.InAskforCheckpointMode = false
+}
+
+func (self *CheckpointManager) GetCheckpointInstanceID() uint64 {
+  return self.Factory.GetCheckpointInstanceID(self.Config.GetMyGroupIdx())
+}
+
+func (self *CheckpointManager) SetMinChosenInstanceID(minChosenInstanceId uint64) error {
+  options := logstorage.WriteOptions{
+    Sync:true,
+  }
+
+  err := self.LogStorage.SetMinChosenInstanceId(options, self.Config.GetMyGroupIdx(), minChosenInstanceId)
+  if err != nil {
+    return err
+  }
+
+  self.MinChosenInstanceID = minChosenInstanceId
+  return nil
+}
+
+func (self *CheckpointManager) SetMinChosenInstanceIDCache(minChosenInstanceID uint64) {
+  self.MinChosenInstanceID = minChosenInstanceID
 }
 
 func (self *CheckpointManager) GetMinChosenInstanceID() uint64 {
@@ -96,6 +128,3 @@ func (self *CheckpointManager) GetMaxChosenInstanceID() uint64 {
   return self.MaxChosenInstanceID
 }
 
-func (self *CheckpointManager) SetMinChosenInstanceID(minChosenInstanceID uint64) error {
-  return nil
-}

@@ -60,7 +60,7 @@ func (self *TimeManager) PopTimeout(timerId *uint32, timerType *int) bool {
   }
 
   timer := obj.(*Timer)
-  nowTime := util.
+  nowTime := util.NowTimeMs()
   if timer.AbsTime > nowTime {
     return false
   }

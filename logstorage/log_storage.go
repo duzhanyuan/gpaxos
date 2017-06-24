@@ -14,4 +14,8 @@ type LogStorage interface {
   GetSystemVariables(groupIdx int32, buffer *[]byte) error
 
   Del(options WriteOptions, groupIdx int32, instanceId uint64) error
+
+  GetLogStorageDirPath(grpupIdx int32) string
+
+  ClearAllLog(groupIdx int32) error
 }

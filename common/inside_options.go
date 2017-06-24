@@ -56,3 +56,19 @@ func GetMaxAcceptTimeoutMs() uint32 {
 func GetCleanerDeleteQps() uint32 {
   return 1000
 }
+
+func GetLeanerSenderPrepareTimeoutMs() uint64 {
+  return 1000
+}
+
+func GetLeanerSender_Ack_TimeoutMs() uint64 {
+  return 1000
+}
+
+func GetLeanerSender_Ack_Lead() uint64 {
+  return 10
+}
+
+func GetLearnerSenderSendQps() uint64 {
+  return 2000
+}
