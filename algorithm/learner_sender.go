@@ -41,6 +41,10 @@ func NewLearnerSender(config *config.Config, learner *Learner, storage logstorag
   return sender
 }
 
+func (self *LearnerSender) Start() {
+  go self.Main()
+}
+
 func (self *LearnerSender) Stop() {
   self.IsEnd = true
 }
@@ -49,7 +53,15 @@ func (self *LearnerSender) Main() {
   self.IsStart = true
 
   for {
+    self.WaitToSend()
 
+    if self.IsEnd {
+      return
+    }
+
+    self.SendLearnedValue(self.BeginInstanceID, self.SendToNodeID)
+
+    self.SendDone()
   }
 }
 

@@ -79,3 +79,9 @@ func (self *LearnerState) GetLearnValue() []byte {
 func (self *LearnerState) GetIsLearned() bool {
   return self.IsLearned
 }
+
+func (self *LearnerState) Init() {
+  self.LearnedValue = make([]byte, 0)
+  self.IsLearned = false
+  self.NewChecksum = 0
+}

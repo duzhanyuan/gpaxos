@@ -24,7 +24,7 @@ type CheckpointReceiver struct {
   HasInitDirMap map[string]bool
 }
 
-func NewCheckpointReceiver(config *config.Config, storage *logstorage.LogStorage) *CheckpointReceiver {
+func NewCheckpointReceiver(config *config.Config, storage logstorage.LogStorage) *CheckpointReceiver {
   receiver := &CheckpointReceiver{
     Config:config,
     Logstorage:storage,

@@ -1,5 +1,27 @@
 package gpaxos
 
+type StateMachineContext struct {
+  SMId int32
+  Context interface{}
+}
+
+func NewStateMachineContext(smid int32, context interface{}) *StateMachineContext {
+  return &StateMachineContext{
+    SMId:smid,
+    Context:context,
+  }
+}
+
+type BatchStateMachineContext struct {
+  StateMachineContexts []*StateMachineContext
+}
+
+func NewBatchStateMachineContext() *BatchStateMachineContext {
+  return &BatchStateMachineContext{
+    StateMachineContexts:make([]*StateMachineContext, 0),
+  }
+}
+
 type StateMachine interface {
   Execute(groupIdx int32, instanceId uint64, paxosValue[]byte, context *StateMachineContext) bool
 

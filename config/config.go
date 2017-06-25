@@ -1,6 +1,9 @@
 package config
 
 type Config struct {
+  IsFollower bool
+  FollowToNodeId uint64
+  SystemStateMachine *SystemStateMachine
 }
 
 func (self *Config) LogSync() bool {
@@ -29,4 +32,20 @@ func (self *Config) GetMajorityCount() int {
 
 func (self *Config) GetNodeCount() int {
   return 0
+}
+
+func (self *Config) IsIMFollower() bool {
+  return self.IsFollower
+}
+
+func (self *Config) GetFollowToNodeID() uint64 {
+  return self.FollowToNodeId
+}
+
+func (self *Config) AddFollowerNode(followerNodeId uint64) {
+
+}
+
+func (self *Config) GetSystemVSM() *SystemStateMachine {
+  return self.SystemStateMachine
 }

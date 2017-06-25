@@ -8,42 +8,20 @@ import (
   "github.com/golang/protobuf/proto"
 )
 
-type StateMachineContext struct {
-  SMId int32
-  Context interface{}
-}
-
-func NewStateMachineContext(smid int32, context interface{}) *StateMachineContext {
-  return &StateMachineContext{
-    SMId:smid,
-    Context:context,
-  }
-}
-
-type BatchStateMachineContext struct {
-  StateMachineContexts []*StateMachineContext
-}
-
-func NewBatchStateMachineContext() *BatchStateMachineContext {
-  return &BatchStateMachineContext{
-    StateMachineContexts:make([]*StateMachineContext, 0),
-  }
-}
-
 type StateMachineFactory struct {
   MyGroupIdx int
-  StateMachines []StateMachine
+  StateMachines []gpaxos.StateMachine
 }
 
 func NewStateMachineFactory(groupIdx int) *StateMachineFactory {
   return &StateMachineFactory{
     MyGroupIdx:groupIdx,
-    StateMachines:make([]StateMachine, 0),
+    StateMachines:make([]gpaxos.StateMachine, 0),
   }
 }
 
 func (self *StateMachineFactory) Execute(groupIdx int32, instanceId uint64,
-                                         paxosValue[]byte, context *StateMachineContext) bool {
+                                         paxosValue[]byte, context *gpaxos.StateMachineContext) bool {
   valueLen := len(paxosValue)
   if valueLen < util.INT32SIZE {
     log.Error("value wrong, instance id %d size %d", instanceId, valueLen)
@@ -60,9 +38,9 @@ func (self *StateMachineFactory) Execute(groupIdx int32, instanceId uint64,
 
   bodyValue := paxosValue[util.INT32SIZE:]
   if smid == gpaxos.BATCH_PROPOSE_SMID {
-    var batchCtx *BatchStateMachineContext
+    var batchCtx *gpaxos.BatchStateMachineContext
     if context != nil && context.Context != nil {
-      batchCtx = context.Context.(*BatchStateMachineContext)
+      batchCtx = context.Context.(*gpaxos.BatchStateMachineContext)
     }
 
     return self.BatchExecute(groupIdx, instanceId, bodyValue, batchCtx)
@@ -72,7 +50,7 @@ func (self *StateMachineFactory) Execute(groupIdx int32, instanceId uint64,
 }
 
 func (self *StateMachineFactory) BatchExecute(groupIdx int32, instanceId uint64,
-                                              bodyValue []byte, batchContext *BatchStateMachineContext) bool {
+                                              bodyValue []byte, batchContext *gpaxos.BatchStateMachineContext) bool {
   var batchPaxosValues common.BatchPaxosValues
   err := proto.Unmarshal(bodyValue, &batchPaxosValues)
 
@@ -88,7 +66,7 @@ func (self *StateMachineFactory) BatchExecute(groupIdx int32, instanceId uint64,
   }
 
   for i, value := range batchPaxosValues.GetValues() {
-    var context *StateMachineContext = nil
+    var context *gpaxos.StateMachineContext = nil
     if batchContext != nil {
       context = batchContext.StateMachineContexts[i]
     }
@@ -103,7 +81,7 @@ func (self *StateMachineFactory) BatchExecute(groupIdx int32, instanceId uint64,
 }
 
 func (self *StateMachineFactory) DoExecute(groupIdx int32, instanceId uint64, bodyValue []byte,
-                                           smid int32, context *StateMachineContext) bool {
+                                           smid int32, context *gpaxos.StateMachineContext) bool {
   if smid == 0 {
     return true
   }
@@ -198,7 +176,7 @@ func (self *StateMachineFactory)PackPaxosValue(value[]byte, smid int32) []byte {
   return util.AppendBytes(paxosValue, value)
 }
 
-func (self *StateMachineFactory) AddStateMachine(stateMachine StateMachine) {
+func (self *StateMachineFactory) AddStateMachine(stateMachine gpaxos.StateMachine) {
   for _, sm := range(self.StateMachines) {
     if sm.SMID() == stateMachine.SMID() {
       return
