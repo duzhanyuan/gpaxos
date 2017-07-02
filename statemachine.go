@@ -31,12 +31,12 @@ type StateMachine interface {
 
   GetCheckpointInstanceID(groupIdx int32) uint64
 
-  LockCheckpointState() int
+  LockCheckpointState() error
 
-  GetCheckpointState(groupIdx int32, dirPath string, fileList []string) int
+  GetCheckpointState(groupIdx int32, dirPath string, fileList []string) error
 
   UnLockCheckpointState()
 
   LoadCheckpointState(groupIdx int32, checkpointTmpFileDirPath string,
-                      fileList []string, checkpointInstanceID uint64) int
+                      fileList []string, checkpointInstanceID uint64) error
 }

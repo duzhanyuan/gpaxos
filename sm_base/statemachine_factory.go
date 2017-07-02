@@ -223,3 +223,7 @@ func (self *StateMachineFactory) GetCheckpointInstanceID(groupIdx int32) uint64 
 
   return cpinstanceId_insize
 }
+
+func (self *StateMachineFactory) GetStateMachines() [] gpaxos.StateMachine{
+  return self.StateMachines
+}

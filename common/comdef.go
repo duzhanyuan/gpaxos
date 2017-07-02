@@ -23,11 +23,18 @@ var (
   ErrDbNotInit         = errors.New("db not init yet")
 )
 
+// MsgCmd
 const (
   MsgCmd_PaxosMsg      = 1
   MsgCmd_CheckpointMsg = 2
 )
 
+// PaxosMsgFlagType
+const (
+  PaxosMsgFlagType_SendLearnValue_NeedAck = 1
+)
+
+// PaxosMsgType
 const (
   MsgType_PaxosPrepare                     = 1
   MsgType_PaxosPrepareReply                = 2
@@ -44,11 +51,31 @@ const (
   MsgType_PaxosLearner_OnAskforCheckpoint  = 13
 )
 
+// TimerType
 const (
   Timer_Proposer_Prepare_Timeout = 1
   Timer_Proposer_Accept_Timeout  = 2
   Timer_Learner_Askforlearn_noop = 3
   Timer_Instance_Commit_Timeout  = 4
+)
+
+// CheckpointMsgType
+const (
+  CheckpointMsgType_SendFile     = 1
+  CheckpointMsgType_SendFile_Ack = 2
+)
+
+// CheckpointSendFileFlag
+const (
+  CheckpointSendFileFlag_BEGIN = 1
+  CheckpointSendFileFlag_ING   = 2
+  CheckpointSendFileFlag_END   = 3
+)
+
+// CheckpointSendFileAckFlag
+const (
+  CheckpointSendFileAckFlag_OK   = 1
+  CheckpointSendFileAckFlag_Fail = 2
 )
 
 var INVALID_INSTANCEID uint64 = uint64(-1)

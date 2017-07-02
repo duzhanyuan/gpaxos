@@ -76,3 +76,7 @@ func GetLearnerSenderSendQps() uint64 {
 func GetAskforLearnInterval() uint32 {
   return 1000
 }
+
+func GetLeanerReceiver_Ack_Lead() uint64 {
+  return 100
+}
