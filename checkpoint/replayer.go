@@ -88,3 +88,7 @@ func (self *Replayer) PlayOne(instanceId uint64) bool {
 
   return ok
 }
+
+func (self *Replayer) Pause() {
+  self.IsPause = true
+}

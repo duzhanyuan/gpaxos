@@ -33,7 +33,7 @@ type StateMachine interface {
 
   LockCheckpointState() error
 
-  GetCheckpointState(groupIdx int32, dirPath string, fileList []string) error
+  GetCheckpointState(groupIdx int32, dirPath *string, fileList []string) error
 
   UnLockCheckpointState()
 

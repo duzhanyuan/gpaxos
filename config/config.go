@@ -1,9 +1,15 @@
 package config
 
+import (
+  "github.com/lichuang/gpaxos/common"
+  "github.com/lichuang/gpaxos/util"
+)
+
 type Config struct {
   IsFollower bool
   FollowToNodeId uint64
   SystemStateMachine *SystemStateMachine
+  MyFollowerMap map[uint64]uint64
 }
 
 func (self *Config) LogSync() bool {
@@ -42,8 +48,12 @@ func (self *Config) GetFollowToNodeID() uint64 {
   return self.FollowToNodeId
 }
 
-func (self *Config) AddFollowerNode(followerNodeId uint64) {
+func (self *Config) GetMyFollowerCount() int32 {
+  return int32(len(self.MyFollowerMap))
+}
 
+func (self *Config) AddFollowerNode(followerNodeId uint64) {
+  self.MyFollowerMap[followerNodeId] = util.NowTimeMs() + uint64(common.GetAskforLearnInterval() * 3)
 }
 
 func (self *Config) GetSystemVSM() *SystemStateMachine {
