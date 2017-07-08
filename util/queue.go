@@ -30,9 +30,9 @@ func (self *Queue) Peek() interface{} {
 
 func (self *Queue) PeekWithTimeout(timeout int32) interface{} {
   for self.Empty() {
-    self.TimeoutCond.Lock.Lock()
-    ret := self.TimeoutCond.WaitOrTimeout(time.Duration(timeout) * time.Microsecond)
-    self.TimeoutCond.Lock.Unlock()
+    self.TimeoutCond.Lock()
+    ret := self.TimeoutCond.WaitFor(time.Duration(timeout) * time.Microsecond)
+    self.TimeoutCond.Unlock()
     if !ret {
       return nil
     }

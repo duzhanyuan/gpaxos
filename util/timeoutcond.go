@@ -8,39 +8,39 @@ import (
 )
 
 type TimeoutCond struct {
-  Locker sync.Locker
-  ch     chan bool
+  locker  sync.Locker
+  channel chan bool
 }
 
 func NewTimeoutCond(l sync.Locker) *TimeoutCond {
   return &TimeoutCond{
-    ch:     make(chan bool),
-    Locker: l,
+    channel: make(chan bool),
+    locker:  l,
   }
 }
 
 func (t *TimeoutCond) Lock() {
-  t.Locker.Lock()
+  t.locker.Lock()
 }
 
 func (t *TimeoutCond) Unlock() {
-  t.Locker.Unlock()
+  t.locker.Unlock()
 }
 
 func (t *TimeoutCond) Wait() {
-  t.Locker.Unlock()
-  <-t.ch
-  t.Locker.Lock()
+  t.locker.Unlock()
+  <-t.channel
+  t.locker.Lock()
 }
 
-func (t *TimeoutCond) WaitOrTimeout(d time.Duration) bool {
+func (t *TimeoutCond) WaitFor(d time.Duration) bool {
   tmo := time.NewTimer(d)
-  t.Locker.Unlock()
+  t.locker.Unlock()
   var r bool
   select {
   case <-tmo.C:
     r = false
-  case <-t.ch:
+  case <-t.channel:
     r = true
   }
   if !tmo.Stop() {
@@ -49,7 +49,7 @@ func (t *TimeoutCond) WaitOrTimeout(d time.Duration) bool {
     default:
     }
   }
-  t.Locker.Lock()
+  t.locker.Lock()
   return r
 }
 
@@ -60,7 +60,6 @@ func (t *TimeoutCond) Signal() {
 func (t *TimeoutCond) Broadcast() {
   for {
     // Stop when we run out of waiters
-    //
     if !t.signal() {
       return
     }
@@ -69,7 +68,7 @@ func (t *TimeoutCond) Broadcast() {
 
 func (t *TimeoutCond) signal() bool {
   select {
-  case t.ch <- true:
+  case t.channel <- true:
     return true
   default:
     return false

@@ -113,7 +113,7 @@ func (self *CommitContext) SetResult(commitret error, instanceId uint64, learnVa
 
 func (self *CommitContext) GetResult(succInstanceId *uint64) error {
   for !self.IsCommitEnd {
-    self.Serialock.WaitOrTimeout(1000 * time.Microsecond)
+    self.Serialock.WaitFor(1000 * time.Microsecond)
   }
 
   if self.CommitRet == nil {

@@ -3,7 +3,6 @@ package util
 import (
   "os"
   "path/filepath"
-  "fmt"
 )
 
 func DeleteDir(path string) error {
@@ -28,7 +27,7 @@ func IterDir(dirPath string, filePathList []string) error {
       return IterDir(path, filePathList)
     }
 
-    filePathList = append(filepath, f.Name())
+    filePathList = append(filePathList, f.Name())
     return nil
   }
 
