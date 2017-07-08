@@ -1,6 +1,5 @@
 package algorithm
 
-
 import (
   "github.com/lichuang/gpaxos/config"
   "github.com/lichuang/gpaxos/common"
@@ -16,18 +15,18 @@ import (
 )
 
 type CheckpointReceiver struct {
-  Config *config.Config
-  Logstorage logstorage.LogStorage
-  SenderNodeId uint64
-  UUID uint64
-  Sequence uint64
+  Config        *config.Config
+  Logstorage    logstorage.LogStorage
+  SenderNodeId  uint64
+  UUID          uint64
+  Sequence      uint64
   HasInitDirMap map[string]bool
 }
 
 func NewCheckpointReceiver(config *config.Config, storage logstorage.LogStorage) *CheckpointReceiver {
   receiver := &CheckpointReceiver{
-    Config:config,
-    Logstorage:storage,
+    Config:     config,
+    Logstorage: storage,
   }
   receiver.Reset()
   return receiver
@@ -58,7 +57,7 @@ func (self *CheckpointReceiver) NewReceiver(senderNodeId uint64, uuid uint64) er
   return nil
 }
 
-func (self *CheckpointReceiver)ClearCheckpointTmp() bool {
+func (self *CheckpointReceiver) ClearCheckpointTmp() bool {
   path := self.Logstorage.GetLogStorageDirPath(self.Config.GetMyGroupIdx())
 
   if !util.IsDirectoryExist(path) {
@@ -79,16 +78,16 @@ func (self *CheckpointReceiver)ClearCheckpointTmp() bool {
   return true
 }
 
-func (self *CheckpointReceiver)IsReceiverFinish(senderNodeId uint64, uuid uint64, endSequence uint64) bool{
+func (self *CheckpointReceiver) IsReceiverFinish(senderNodeId uint64, uuid uint64, endSequence uint64) bool {
   if senderNodeId == self.SenderNodeId &&
-     uuid == self.UUID && endSequence == self.Sequence + 1 {
+    uuid == self.UUID && endSequence == self.Sequence+1 {
     return true
   }
 
   return false
 }
 
-func (self *CheckpointReceiver)GetTmpDirPath(smid int32) string {
+func (self *CheckpointReceiver) GetTmpDirPath(smid int32) string {
   path := self.Logstorage.GetLogStorageDirPath(self.Config.GetMyGroupIdx())
 
   return fmt.Sprintf("%s/cp_tmp_%d", path, smid)
@@ -112,8 +111,8 @@ func (self *CheckpointReceiver) InitFilePath(path string, formatFilePath *string
   }
 
   *formatFilePath = ""
-  for i, dir := range(dirList) {
-    if i + 1 == len(dirList) {
+  for i, dir := range (dirList) {
+    if i+1 == len(dirList) {
       *formatFilePath += dir
     } else {
       *formatFilePath += dir + "/"
@@ -153,7 +152,7 @@ func (self *CheckpointReceiver) ReceiveCheckpoint(msg common.CheckpointMsg) erro
     return nil
   }
 
-  if msg.GetSequence() != self.Sequence + 1 {
+  if msg.GetSequence() != self.Sequence+1 {
     log.Error("msg seq wrong, msg.seq %d receiver.seq %d", msg.GetSequence(), self.Sequence)
     return errors.New("error msg")
   }
@@ -165,7 +164,7 @@ func (self *CheckpointReceiver) ReceiveCheckpoint(msg common.CheckpointMsg) erro
     return err
   }
 
-  file, err := os.OpenFile(formatPath, os.O_CREATE | os.O_RDWR | os.O_APPEND, os.ModePerm)
+  file, err := os.OpenFile(formatPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, os.ModePerm)
   if err != nil {
     log.Error("open file fail:%v, file path:%s", err, formatPath)
     return err

@@ -8,16 +8,16 @@ import (
 )
 
 func lockAndSignal(t *TimeoutCond) {
-  t.Lock.Lock()
+  t.Lock()
   t.Signal()
-  t.Lock.Unlock()
+  t.Unlock()
 }
 
 func waitAndPrint(t *TimeoutCond, i int) {
-  t.Lock.Lock()
+  t.Lock()
   fmt.Println("Goroutine", i, "waiting...")
   ok := t.WaitOrTimeout(10 * time.Second)
-  t.Lock.Unlock()
+  t.Unlock()
   fmt.Println("This is goroutine", i, "ok:", ok)
 }
 
@@ -26,27 +26,26 @@ func TestTimeoutCond(test *testing.T) {
   t := NewTimeoutCond(&m)
 
   // Simple wait
-  //
-  t.Lock.Lock()
+  t.Lock()
   go lockAndSignal(t)
   t.Wait()
-  t.Lock.Unlock()
+  t.Unlock()
   fmt.Println("Simple wait finished.")
 
   // Wait that times out
   //
-  t.Lock.Lock()
+  t.Lock()
   ok := t.WaitOrTimeout(100 * time.Millisecond)
-  t.Lock.Unlock()
+  t.Unlock()
   fmt.Println("Timeout wait finished. Timeout:", !ok)
 
   for i := 0; i < 10; i++ {
     go waitAndPrint(t, i)
   }
   time.Sleep(1 * time.Second)
-  t.Lock.Lock()
+  t.Lock()
   fmt.Println("About to signal")
   t.Broadcast()
-  t.Lock.Unlock()
+  t.Unlock()
   time.Sleep(10 * time.Second)
 }

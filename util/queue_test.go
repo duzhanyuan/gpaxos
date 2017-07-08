@@ -4,12 +4,12 @@ import (
   "testing"
 )
 
-func TestQequeAppend(t *testing.T) {
+func TestQueueAppend(t *testing.T) {
   queue := NewQueue()
   var value int32 = 100
 
   go func() {
-    queue.Add(value, true)
+    queue.Add(value)
   }()
 
   ret := queue.PeekWithTimeout(5000)

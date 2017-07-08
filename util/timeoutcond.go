@@ -8,26 +8,34 @@ import (
 )
 
 type TimeoutCond struct {
-  Lock sync.Locker
-  ch   chan bool
+  Locker sync.Locker
+  ch     chan bool
 }
 
 func NewTimeoutCond(l sync.Locker) *TimeoutCond {
   return &TimeoutCond{
-    ch:   make(chan bool),
-    Lock: l,
+    ch:     make(chan bool),
+    Locker: l,
   }
 }
 
+func (t *TimeoutCond) Lock() {
+  t.Locker.Lock()
+}
+
+func (t *TimeoutCond) Unlock() {
+  t.Locker.Unlock()
+}
+
 func (t *TimeoutCond) Wait() {
-  t.Lock.Unlock()
+  t.Locker.Unlock()
   <-t.ch
-  t.Lock.Lock()
+  t.Locker.Lock()
 }
 
 func (t *TimeoutCond) WaitOrTimeout(d time.Duration) bool {
   tmo := time.NewTimer(d)
-  t.Lock.Unlock()
+  t.Locker.Unlock()
   var r bool
   select {
   case <-tmo.C:
@@ -41,7 +49,7 @@ func (t *TimeoutCond) WaitOrTimeout(d time.Duration) bool {
     default:
     }
   }
-  t.Lock.Lock()
+  t.Locker.Lock()
   return r
 }
 
