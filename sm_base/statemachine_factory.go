@@ -9,11 +9,11 @@ import (
 )
 
 type StateMachineFactory struct {
-  MyGroupIdx int
+  MyGroupIdx int32
   StateMachines []gpaxos.StateMachine
 }
 
-func NewStateMachineFactory(groupIdx int) *StateMachineFactory {
+func NewStateMachineFactory(groupIdx int32) *StateMachineFactory {
   return &StateMachineFactory{
     MyGroupIdx:groupIdx,
     StateMachines:make([]gpaxos.StateMachine, 0),

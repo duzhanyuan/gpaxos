@@ -14,6 +14,19 @@ var (
   PaxosTryCommitRet_TooManyThreadWaiting_Reject = errors.New("PaxosTryCommitRet_TooManyThreadWaiting_Reject")
 )
 
+var (
+  Paxos_SystemError                           = errors.New("Paxos_SystemError")
+  Paxos_GroupIdxWrong                         = errors.New("Paxos_GroupIdxWrong")
+  Paxos_MembershipOp_GidNotSame               = errors.New("Paxos_MembershipOp_GidNotSame")
+  Paxos_MembershipOp_VersionConflit           = errors.New("Paxos_MembershipOp_VersionConflit")
+  Paxos_MembershipOp_NoGid                    = errors.New("Paxos_MembershipOp_NoGid")
+  Paxos_MembershipOp_Add_NodeExist            = errors.New("Paxos_MembershipOp_Add_NodeExist")
+  Paxos_MembershipOp_Remove_NodeNotExist      = errors.New("Paxos_MembershipOp_Remove_NodeNotExist")
+  Paxos_MembershipOp_Change_NoChange          = errors.New("Paxos_MembershipOp_Change_NoChange")
+  Paxos_GetInstanceValue_Value_NotExist       = errors.New("Paxos_GetInstanceValue_Value_NotExist")
+  Paxos_GetInstanceValue_Value_Not_Chosen_Yet = errors.New("Paxos_GetInstanceValue_Value_Not_Chosen_Yet")
+)
+
 const (
   SYSTEM_V_SMID      = 100000000
   MASTER_V_SMID      = 100000001

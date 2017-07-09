@@ -12,14 +12,14 @@ import (
 )
 
 type Acceptor struct {
-  base          *Base
+  Base
   config        *config.Config
   acceptorState *AcceptorState
 }
 
 func NewAcceptor(config *config.Config, transport common.MsgTransport, instance *Instance, storage logstorage.LogStorage) *Acceptor {
   acceptor := new(Acceptor)
-  acceptor.base = newBase(config, transport, instance)
+  acceptor.Base = newBase(config, transport, instance)
   acceptor.acceptorState = newAcceptorState(config, storage)
   acceptor.config = config
 
@@ -38,13 +38,13 @@ func (self *Acceptor) Init() error {
     log.Info("empty database")
   }
 
-  self.base.SetInstanceId(instanceId)
+  self.SetInstanceId(instanceId)
 
   return nil
 }
 
 func (self *Acceptor) NewInstance() {
-  self.base.NewInstance()
+  self.NewInstance()
   self.acceptorState.init()
 }
 
@@ -52,12 +52,12 @@ func (self *Acceptor) GetAcceptorState() *AcceptorState {
   return self.acceptorState
 }
 
-func (self *Acceptor) OnPrepare(msg common.PaxosMsg) error {
+func (self *Acceptor) OnPrepare(msg *common.PaxosMsg) error {
   log.Info("start prepare msg instanceid %d, from %d, proposalid %d",
     msg.GetInstanceID(), msg.GetNodeID(), msg.GetProposalID())
 
   reply := common.PaxosMsg{
-    InstanceID: proto.Uint64(self.base.GetInstanceId()),
+    InstanceID: proto.Uint64(self.GetInstanceId()),
     NodeID:     proto.Uint64(self.config.GetMyNodeId()),
     ProposalID: proto.Uint64(msg.GetProposalID()),
     MsgType:    proto.Int32(common.MsgType_PaxosPrepareReply),
@@ -77,10 +77,10 @@ func (self *Acceptor) OnPrepare(msg common.PaxosMsg) error {
       reply.Value = util.CopyBytes(self.acceptorState.AcceptValue)
     }
 
-    self.acceptorState.PromiseNum = *ballot
-    err := self.acceptorState.Persist(self.base.GetInstanceId(), self.base.GetLastChecksum())
+    self.acceptorState.PromiseNum = ballot
+    err := self.acceptorState.Persist(self.GetInstanceId(), self.GetLastChecksum())
     if err != nil {
-      log.Error("persist fail, now instanceid %d ret %v", self.base.GetInstanceId(), err)
+      log.Error("persist fail, now instanceid %d ret %v", self.GetInstanceId(), err)
       return err
     }
   } else {
@@ -91,19 +91,19 @@ func (self *Acceptor) OnPrepare(msg common.PaxosMsg) error {
   }
 
   replyNodeId := msg.GetNodeID()
-  log.Info("end prepare instanceid %d replynodeid %d", self.base.GetInstanceId(), replyNodeId)
+  log.Info("end prepare instanceid %d replynodeid %d", self.GetInstanceId(), replyNodeId)
 
-  self.base.SendPaxosMessage(replyNodeId, reply, common.Message_SendType_UDP)
+  self.SendPaxosMessage(replyNodeId, reply, common.Message_SendType_UDP)
 
   return nil
 }
 
-func (self *Acceptor) OnAccept(msg common.PaxosMsg) error {
+func (self *Acceptor) OnAccept(msg *common.PaxosMsg) error {
   log.Info("start accept msg instanceid %d, from %d, proposalid %d, valuelen %d",
     msg.GetInstanceID(), msg.GetNodeID(), msg.GetProposalID(), len(msg.Value))
 
   reply := common.PaxosMsg{
-    InstanceID: proto.Uint64(self.base.GetInstanceId()),
+    InstanceID: proto.Uint64(self.GetInstanceId()),
     NodeID:     proto.Uint64(self.config.GetMyNodeId()),
     ProposalID: proto.Uint64(msg.GetProposalID()),
     MsgType:    proto.Int32(common.MsgType_PaxosAcceptReply),
@@ -116,13 +116,13 @@ func (self *Acceptor) OnAccept(msg common.PaxosMsg) error {
       self.acceptorState.GetPromiseNum().proposalId, self.acceptorState.GetPromiseNum().nodeId,
       self.acceptorState.GetAcceptedNum().proposalId, self.acceptorState.GetAcceptedNum().nodeId)
 
-    self.acceptorState.PromiseNum = *ballot
-    self.acceptorState.AcceptedNum = *ballot
+    self.acceptorState.PromiseNum = ballot
+    self.acceptorState.AcceptedNum = ballot
     self.acceptorState.AcceptValue = util.CopyBytes(msg.Value)
 
-    err := self.acceptorState.Persist(self.base.GetInstanceId(), self.base.GetLastChecksum())
+    err := self.acceptorState.Persist(self.GetInstanceId(), self.GetLastChecksum())
     if err != nil {
-      log.Error("persist fail, now instanceid %d ret %v", self.base.GetInstanceId(), err)
+      log.Error("persist fail, now instanceid %d ret %v", self.GetInstanceId(), err)
       return err
     }
   } else {
@@ -133,9 +133,13 @@ func (self *Acceptor) OnAccept(msg common.PaxosMsg) error {
   }
 
   replyNodeId := msg.GetNodeID()
-  log.Info("end accept instanceid %d replynodeid %d", self.base.GetInstanceId(), replyNodeId)
+  log.Info("end accept instanceid %d replynodeid %d", self.GetInstanceId(), replyNodeId)
 
-  self.base.SendPaxosMessage(replyNodeId, reply, common.Message_SendType_UDP)
+  self.SendPaxosMessage(replyNodeId, reply, common.Message_SendType_UDP)
 
   return nil
+}
+
+func (self *Acceptor) InitForNewPaxosInstance() {
+  self.acceptorState.init()
 }

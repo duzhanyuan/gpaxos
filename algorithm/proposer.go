@@ -28,7 +28,7 @@ type Proposer struct {
   TimeStat             *util.TimeStat
 }
 
-func NewProposer(config *config.Config, transport *common.MsgTransport,
+func NewProposer(config *config.Config, transport common.MsgTransport,
   instance *Instance, learner *Learner, thread *IOThread) *Proposer {
   proposer := &Proposer{
     Base:     newBase(config, transport, instance),
@@ -137,7 +137,7 @@ func (self *Proposer) Prepare(needNewBallot bool) {
   self.BroadcastMessage(msg, BroadcastMessage_Type_RunSelf_First, common.Message_SendType_UDP)
 }
 
-func (self *Proposer) OnPrepareReply(msg common.PaxosMsg) {
+func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) {
   log.Info("start msg.proposal id %d state.proposal id %d msg.from nodeid %d rejectbypromiseid %d",
     msg.GetProposalID(), self.State.GetProposalId(), msg.GetNodeID(), msg.GetRejectByPromiseID())
 
@@ -200,7 +200,7 @@ func (self *Proposer) Accept() {
   self.BroadcastMessage(msg, BroadcastMessage_Type_RunSelf_Final, common.Message_SendType_UDP)
 }
 
-func (self *Proposer) OnAcceptReply(msg common.PaxosMsg) {
+func (self *Proposer) OnAcceptReply(msg *common.PaxosMsg) {
   state := self.State
   log.Info("start msg.proposerid %d state.proposerid %d msg.from_nodeid %d reject by promise id %d",
     msg.GetProposalID(), state.ProposalId, msg.GetNodeID(), msg.GetRejectByPromiseID())

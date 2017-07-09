@@ -18,7 +18,7 @@ const (
 type Cleaner struct {
   Config     *config.Config
   Factory    *sm_base.StateMachineFactory
-  Logstorage *logstorage.LogStorage
+  Logstorage logstorage.LogStorage
   CpMng      *CheckpointManager
   LastSave   uint64
   CanRun     bool
@@ -29,7 +29,7 @@ type Cleaner struct {
 }
 
 func NewCleaner(config *config.Config, factory *sm_base.StateMachineFactory,
-  storage *logstorage.LogStorage, cpmng *CheckpointManager) *Cleaner {
+  storage logstorage.LogStorage, cpmng *CheckpointManager) *Cleaner {
   return &Cleaner{
     Config:     config,
     Factory:    factory,

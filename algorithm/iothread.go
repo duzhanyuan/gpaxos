@@ -8,6 +8,8 @@ import (
   "github.com/lichuang/gpaxos/common"
 )
 
+const RETRY_QUEUE_MAX_LEN = 300
+
 type IOThread struct {
   IsEnd        bool
   IsStart      bool
@@ -20,7 +22,7 @@ type IOThread struct {
 }
 
 func NewIOThread(config *config.Config, instance *Instance) *IOThread {
-  return &IOThread{
+  iothread := &IOThread{
     TimerMng:     util.NewTimerManager(),
     TimerIdMap:   make(map[uint32]bool),
     Instance:     instance,
@@ -28,12 +30,18 @@ func NewIOThread(config *config.Config, instance *Instance) *IOThread {
     RetryQueue:   util.NewDeque(),
     QueueMemSize: 0,
   }
+
+  return iothread
 }
 
-func (self *IOThread) Run() {
+func (self *IOThread) Start() {
   self.IsEnd = false
   self.IsStart = true
   go self.Main()
+}
+
+func (self *IOThread) Stop() {
+  self.IsEnd = true
 }
 
 func (self *IOThread) Main() {
@@ -52,7 +60,7 @@ func (self *IOThread) Main() {
 
 func (self *IOThread) OneLoop(timeoutMs int32) {
   self.MessageQueue.Lock()
-  ret := self.MessageQueue.PeekWithTimeout(timeoutMs)
+  ret := self.MessageQueue.PeekWithTimeout(int(timeoutMs))
   if ret == nil {
     self.MessageQueue.Unlock()
   } else {
@@ -125,7 +133,7 @@ func (self *IOThread) DealWithRetry() {
     if msgInstanceId == nowInstanceId + 1 {
       if haveRetryOne {
         log.Debug("retry msg (i+1). instanceid %d", msgInstanceId)
-        self.Instance.OnReceivePaxosMsg(msg)
+        self.Instance.OnReceivePaxosMsg(msg, false)
       } else {
         break
       }
@@ -133,7 +141,7 @@ func (self *IOThread) DealWithRetry() {
 
     if msgInstanceId == nowInstanceId {
       log.Debug("retry msg. instanceid %d", msgInstanceId)
-      self.Instance.OnReceivePaxosMsg(msg)
+      self.Instance.OnReceivePaxosMsg(msg, false)
       haveRetryOne = true
     }
   }
@@ -189,4 +197,8 @@ func (self *IOThread) DealwithTimeout(nextTimeout *int32) {
       break
     }
   }
+}
+
+func (self *IOThread) ClearRetryQueue() {
+  self.RetryQueue = util.NewDeque()
 }

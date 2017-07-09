@@ -56,6 +56,22 @@ func (self *Config) AddFollowerNode(followerNodeId uint64) {
   self.MyFollowerMap[followerNodeId] = util.NowTimeMs() + uint64(common.GetAskforLearnInterval() * 3)
 }
 
+func (self *Config) AddTmpNodeOnlyForLearn(nodeId uint64) {
+
+}
+
 func (self *Config) GetSystemVSM() *SystemStateMachine {
   return self.SystemStateMachine
+}
+
+func (self *Config) CheckConfig() bool {
+  return true
+}
+
+func (self *Config) GetIsUseMembership() bool {
+  return false
+}
+
+func (self *Config) IsValidNodeID(nodeId uint64) bool {
+  return true
 }

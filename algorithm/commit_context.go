@@ -8,33 +8,32 @@ import (
   "github.com/lichuang/gpaxos"
   "bytes"
   "sync"
-  "time"
 )
 
 type CommitContext struct {
-  Config *config.Config
-  InstanceId uint64
-  IsCommitEnd bool
-  TimeoutMs uint64
-  Value []byte
+  Config              *config.Config
+  InstanceId          uint64
+  IsCommitEnd         bool
+  TimeoutMs           uint32
+  Value               []byte
   StateMachineContext *gpaxos.StateMachineContext
-  Mutext sync.Mutex
-  Serialock *util.TimeoutCond
-  CommitRet error
+  Mutext              sync.Mutex
+  Serialock           *util.TimeoutCond
+  CommitRet           error
 }
 
 func NewCommitContext(config *config.Config) *CommitContext {
   context := &CommitContext{
-    Config:config,
-    Value:nil,
+    Config: config,
+    Value:  nil,
   }
-  context.Serialock = util.NewTimeoutCondWithMutex()
+  context.Serialock = util.NewTimeoutCond()
   context.NewCommit(nil, nil, 0)
 
   return context
 }
 
-func (self *CommitContext) NewCommit(value []byte, context *gpaxos.StateMachineContext, timeout uint64) {
+func (self *CommitContext) NewCommit(value []byte, context *gpaxos.StateMachineContext, timeout uint32) {
   self.Mutext.Lock()
 
   self.InstanceId = common.INVALID_INSTANCEID
@@ -46,7 +45,7 @@ func (self *CommitContext) NewCommit(value []byte, context *gpaxos.StateMachineC
   self.Mutext.Unlock()
 }
 
-func (self *CommitContext)IsNewCommit() bool {
+func (self *CommitContext) IsNewCommit() bool {
   if self.InstanceId != common.INVALID_INSTANCEID && self.Value != nil {
     return true
   }
@@ -54,7 +53,7 @@ func (self *CommitContext)IsNewCommit() bool {
   return false
 }
 
-func (self *CommitContext) GetCommitValue() []byte{
+func (self *CommitContext) GetCommitValue() []byte {
   return self.Value
 }
 
@@ -64,13 +63,14 @@ func (self *CommitContext) StartCommit(instanceId uint64) {
   self.Mutext.Unlock()
 }
 
-func (self *CommitContext) IsMyCommit(instanceId uint64, learnValue []byte, context *gpaxos.StateMachineContext) bool {
+func (self *CommitContext) IsMyCommit(instanceId uint64, learnValue []byte)(bool,*gpaxos.StateMachineContext) {
   self.Mutext.Lock()
 
+  var ctx *gpaxos.StateMachineContext
   isMyCommit := false
 
   if !self.IsCommitEnd && self.InstanceId == instanceId {
-    if bytes.Compare(self.Value, learnValue) == 0{
+    if bytes.Compare(self.Value, learnValue) == 0 {
       isMyCommit = true
     } else {
       isMyCommit = false
@@ -78,11 +78,11 @@ func (self *CommitContext) IsMyCommit(instanceId uint64, learnValue []byte, cont
   }
 
   if isMyCommit {
-    context = self.StateMachineContext
+    ctx = self.StateMachineContext
   }
   self.Mutext.Unlock()
 
-  return isMyCommit
+  return isMyCommit, ctx
 }
 
 func (self *CommitContext) SetResultOnlyRet(commitret error) {
@@ -128,6 +128,6 @@ func (self *CommitContext) GetResult(succInstanceId *uint64) error {
   return self.CommitRet
 }
 
-func (self *CommitContext) GetTimeoutMs() uint64 {
+func (self *CommitContext) GetTimeoutMs() uint32 {
   return self.TimeoutMs
 }

@@ -33,7 +33,7 @@ func init() {
   CHECKSUM_LEN = int32(util.UINT32SIZE)
 }
 
-func newBase(config *config.Config, transport *common.MsgTransport, instance *Instance) Base {
+func newBase(config *config.Config, transport common.MsgTransport, instance *Instance) Base {
   return Base{
     config:config,
     transport:transport,
@@ -111,47 +111,7 @@ func (self *Base) PackBaseMsg(body []byte, cmd int32, buffer []byte) error {
 }
 
 func (self *Base) UnpackBaseMsg(buffer []byte, header *common.Header, bodyStartPos *int32, bodyLen *int32) error {
-  var bufferLen int32 = int32(len(buffer))
-
-  var headerLen uint16
-  util.DecodeUint16(buffer, int(GROUPIDXLEN), &headerLen)
-
-  headerStartPos := GROUPIDXLEN + HEADLEN_LEN
-  *bodyStartPos = int32(headerStartPos + int32(headerLen))
-
-  if *bodyStartPos > bufferLen {
-    log.Error("header headerlen too long %d", headerLen)
-    return common.ErrInvalidMsg
-  }
-
-  err := proto.Unmarshal(buffer[headerStartPos:], header)
-  if err != nil {
-    log.Error("header unmarshal fail:%v", err)
-    return common.ErrInvalidMsg
-  }
-
-  log.Debug("buffer size %d,header len %d, cmd %d, gid %d, rid %d, "+
-    "version %d, body startpos %d",
-    bufferLen, headerLen, header.GetCmdid(), header.GetGid(), header.GetRid(),
-    header.GetVersion(), *bodyStartPos)
-
-  if *bodyStartPos+int32(CHECKSUM_LEN) > bufferLen {
-    log.Error("no checksum, body start pos %d, buffersize %d", *bodyStartPos, bufferLen)
-    return common.ErrInvalidMsg
-  }
-
-  *bodyLen = bufferLen - int32(CHECKSUM_LEN) - *bodyStartPos
-
-  var cksum uint32
-  util.DecodeUint32(buffer, int(bufferLen-CHECKSUM_LEN), &cksum)
-
-  calCksum := util.Crc32(0, buffer[:bufferLen-CHECKSUM_LEN], common.NET_CRC32SKIP)
-  if calCksum != cksum {
-    log.Error("data bring cksum %d not equal to cal cksum %d", cksum, calCksum)
-    return common.ErrInvalidMsg
-  }
-
-  return nil
+  return UnpackBaseMsg(buffer, header, bodyStartPos, bodyLen)
 }
 
 func (self *Base) SendCheckpointMessage(sendToNodeid uint64, msg common.CheckpointMsg, sendType int) error {
@@ -231,4 +191,49 @@ func (self *Base) BroadcastMessageToTempNode(msg common.PaxosMsg, sendType int) 
 
 func (self *Base) SetAsTestNode() {
   self.isTestNode = true
+}
+
+// common function
+func UnpackBaseMsg(buffer []byte, header *common.Header, bodyStartPos *int32, bodyLen *int32) error {
+  var bufferLen int32 = int32(len(buffer))
+
+  var headerLen uint16
+  util.DecodeUint16(buffer, int(GROUPIDXLEN), &headerLen)
+
+  headerStartPos := GROUPIDXLEN + HEADLEN_LEN
+  *bodyStartPos = int32(headerStartPos + int32(headerLen))
+
+  if *bodyStartPos > bufferLen {
+    log.Error("header headerlen too long %d", headerLen)
+    return common.ErrInvalidMsg
+  }
+
+  err := proto.Unmarshal(buffer[headerStartPos:], header)
+  if err != nil {
+    log.Error("header unmarshal fail:%v", err)
+    return common.ErrInvalidMsg
+  }
+
+  log.Debug("buffer size %d,header len %d, cmd %d, gid %d, rid %d, "+
+    "version %d, body startpos %d",
+    bufferLen, headerLen, header.GetCmdid(), header.GetGid(), header.GetRid(),
+    header.GetVersion(), *bodyStartPos)
+
+  if *bodyStartPos+int32(CHECKSUM_LEN) > bufferLen {
+    log.Error("no checksum, body start pos %d, buffersize %d", *bodyStartPos, bufferLen)
+    return common.ErrInvalidMsg
+  }
+
+  *bodyLen = bufferLen - int32(CHECKSUM_LEN) - *bodyStartPos
+
+  var cksum uint32
+  util.DecodeUint32(buffer, int(bufferLen-CHECKSUM_LEN), &cksum)
+
+  calCksum := util.Crc32(0, buffer[:bufferLen-CHECKSUM_LEN], common.NET_CRC32SKIP)
+  if calCksum != cksum {
+    log.Error("data bring cksum %d not equal to cal cksum %d", cksum, calCksum)
+    return common.ErrInvalidMsg
+  }
+
+  return nil
 }

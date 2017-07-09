@@ -13,26 +13,26 @@ type CheckpointManager struct {
   Config                   *config.Config
   LogStorage               logstorage.LogStorage
   Factory                  *sm_base.StateMachineFactory
-  Replayer                 *Replayer
-  Cleaner                  *Cleaner
+  replayer                 *Replayer
+  cleaner                  *Cleaner
   MinChosenInstanceID      uint64
   MaxChosenInstanceID      uint64
-  InAskforCheckpointMode   bool
+  inAskforCheckpointMode   bool
   NeedAskNodes             map[uint64]bool
   LastAskforCheckpointTime uint64
   UseCheckpointReplayer    bool
 }
 
 func NewCheckpointManager(config *config.Config, factory *sm_base.StateMachineFactory,
-  storage *logstorage.LogStorage, useReplayer bool) *CheckpointManager {
+  storage logstorage.LogStorage, useReplayer bool) *CheckpointManager {
   mng := &CheckpointManager{
     Config:                config,
     LogStorage:            storage,
     Factory:               factory,
     UseCheckpointReplayer: useReplayer,
   }
-  mng.Replayer = NewReplayer(config, factory, storage, mng)
-  mng.Cleaner = NewCleaner(config, factory, storage, mng)
+  mng.replayer = NewReplayer(config, factory, storage, mng)
+  mng.cleaner = NewCleaner(config, factory, storage, mng)
 
   return mng
 }
@@ -43,24 +43,24 @@ func (self *CheckpointManager) Init() error {
     return err
   }
 
-  err = self.Cleaner.FixMinChosenInstanceID(self.MinChosenInstanceID)
+  err = self.cleaner.FixMinChosenInstanceID(self.MinChosenInstanceID)
   return err
 }
 
 func (self *CheckpointManager) Start() {
   if self.UseCheckpointReplayer {
-    self.Replayer.Start()
+    self.replayer.Start()
   }
 
-  self.Cleaner.Start()
+  self.cleaner.Start()
 }
 
 func (self *CheckpointManager) Stop() {
   if self.UseCheckpointReplayer {
-    self.Replayer.Stop()
+    self.replayer.Stop()
   }
 
-  self.Cleaner.Stop()
+  self.cleaner.Stop()
 }
 
 func (self *CheckpointManager) PrepareForAskforCheckpoint(sendNodeId uint64) error {
@@ -85,17 +85,17 @@ func (self *CheckpointManager) PrepareForAskforCheckpoint(sendNodeId uint64) err
   }
 
   self.LastAskforCheckpointTime = 0
-  self.InAskforCheckpointMode = true
+  self.inAskforCheckpointMode = true
 
   return nil
 }
 
 func (self *CheckpointManager) InAskforcheckpointMode() bool {
-  return self.InAskforCheckpointMode
+  return self.inAskforCheckpointMode
 }
 
 func (self *CheckpointManager) ExitCheckpointMode() {
-  self.InAskforCheckpointMode = false
+  self.inAskforCheckpointMode = false
 }
 
 func (self *CheckpointManager) GetCheckpointInstanceID() uint64 {
@@ -116,6 +116,10 @@ func (self *CheckpointManager) SetMinChosenInstanceID(minChosenInstanceId uint64
   return nil
 }
 
+func (self *CheckpointManager) SetMaxChosenInstanceID(maxChosenInstanceId uint64) error {
+  self.MaxChosenInstanceID = maxChosenInstanceId
+}
+
 func (self *CheckpointManager) SetMinChosenInstanceIDCache(minChosenInstanceID uint64) {
   self.MinChosenInstanceID = minChosenInstanceID
 }
@@ -126,5 +130,13 @@ func (self *CheckpointManager) GetMinChosenInstanceID() uint64 {
 
 func (self *CheckpointManager) GetMaxChosenInstanceID() uint64 {
   return self.MaxChosenInstanceID
+}
+
+func (self *CheckpointManager) GetCleaner() *Cleaner {
+  return self.cleaner
+}
+
+func (self *CheckpointManager) GetReplayer() *Replayer {
+  return self.replayer
 }
 

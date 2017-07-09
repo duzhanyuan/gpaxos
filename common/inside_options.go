@@ -80,3 +80,7 @@ func GetAskforLearnInterval() uint32 {
 func GetLeanerReceiver_Ack_Lead() uint64 {
   return 100
 }
+
+func GetMaxValueSize() int {
+  return 10240
+}

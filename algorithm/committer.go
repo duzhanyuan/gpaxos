@@ -9,40 +9,40 @@ import (
 )
 
 type Committer struct {
-  config *config.Config
+  config    *config.Config
   commitCtx *CommitContext
-  iothread *IOThread
-  factory *sm_base.StateMachineFactory
+  iothread  *IOThread
+  factory   *sm_base.StateMachineFactory
 
-  timeoutMs uint64
+  timeoutMs   uint64
   LastLogTime uint64
-  waitLock *util.WaitLock
+  waitLock    *util.WaitLock
 }
 
 func NewCommitter(config *config.Config, ctx *CommitContext, iothread *IOThread,
-                  factory *sm_base.StateMachineFactory) *Committer {
+  factory *sm_base.StateMachineFactory) *Committer {
   return &Committer{
-    config:config,
-    commitCtx:ctx,
-    iothread:iothread,
-    factory:factory,
-    LastLogTime:util.NowTimeMs(),
-    waitLock:util.NewWaitLock(),
+    config:      config,
+    commitCtx:   ctx,
+    iothread:    iothread,
+    factory:     factory,
+    LastLogTime: util.NowTimeMs(),
+    waitLock:    util.NewWaitLock(),
   }
 }
 
-func (self *Committer)NewValue(value []byte) error {
+func (self *Committer) NewValue(value []byte) error {
   var instanceId uint64 = 0
   return self.NewValueGetID(value, &instanceId, nil)
 }
 
-func (self *Committer) NewValueGetIDNoContext(value []byte, instanceId *uint64) error{
+func (self *Committer) NewValueGetIDNoContext(value []byte, instanceId *uint64) error {
   return self.NewValueGetID(value, instanceId, nil)
 }
 
 func (self *Committer) NewValueGetID(value []byte, instanceId *uint64, context *gpaxos.StateMachineContext) error {
   err := gpaxos.PaxosTryCommitRet_OK
-  for retryCnt := 3;retryCnt > 0;retryCnt-- {
+  for retryCnt := 3; retryCnt > 0; retryCnt-- {
     err = self.NewValueGetIDNoRetry(value, instanceId, context)
     if err != gpaxos.PaxosTryCommitRet_Conflict {
       break
@@ -101,21 +101,21 @@ func (self *Committer) NewValueGetIDNoRetry(value []byte, instaneId *uint64, con
   return err
 }
 
-func (self *Committer)SetTimeoutMs(timeoutMs uint64) {
+func (self *Committer) SetTimeoutMs(timeoutMs uint64) {
   self.timeoutMs = timeoutMs
 }
 
-func (self *Committer)SetMaxHoldThreads(maxHoldThreads int) {
+func (self *Committer) SetMaxHoldThreads(maxHoldThreads int) {
   self.waitLock.SetMaxWaitLogCount(maxHoldThreads)
 }
 
-func (self *Committer)SetProposeWaitTimeThresholdMS(waitTimeThresholdMS int) {
+func (self *Committer) SetProposeWaitTimeThresholdMS(waitTimeThresholdMS int) {
   self.waitLock.SetLockWaitTimeThreshold(waitTimeThresholdMS)
 }
 
 func (self *Committer) LogStatus() {
   nowTime := util.NowTimeMs()
-  if nowTime > self.LastLogTime && nowTime - self.LastLogTime > 1000 {
+  if nowTime > self.LastLogTime && nowTime-self.LastLogTime > 1000 {
     self.LastLogTime = nowTime
     log.Info("wait threads %d avg thread wait ms %d reject rate %d",
       self.waitLock.GetNowHoldThreadCount(), self.waitLock.GetNowAvgThreadWaitTime(),

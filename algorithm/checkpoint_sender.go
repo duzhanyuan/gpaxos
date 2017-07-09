@@ -61,14 +61,14 @@ func (self *CheckpointSender) main() {
   self.AbsLastAckTime = util.NowTimeMs()
   needContinue := false
 
-  for !self.CpMng.Replayer.IsPause {
+  for !self.CpMng.replayer.IsPause {
     if self.isEnd {
       self.IsEnded = true
       return
     }
 
     needContinue = true
-    self.CpMng.Replayer.Pause()
+    self.CpMng.replayer.Pause()
     log.Debug("wait replayer paused")
     time.Sleep(time.Microsecond * 100)
   }
@@ -80,7 +80,7 @@ func (self *CheckpointSender) main() {
   }
 
   if needContinue {
-    self.CpMng.Replayer.Continue()
+    self.CpMng.replayer.Continue()
   }
 
   log.Info("Checkpoint.Sender [END]")
