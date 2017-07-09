@@ -14,7 +14,7 @@ type Queue struct {
 func NewQueue() *Queue {
   queue := &Queue{}
 
-  queue.TimeoutCond = NewTimeoutCond(&queue.Mutex)
+  queue.TimeoutCond = NewTimeoutCondWithMutex(&queue.Mutex)
   queue.Storage = NewDeque()
 
   return queue
@@ -28,10 +28,10 @@ func (self *Queue) Peek() interface{} {
   return self.Storage.Pop()
 }
 
-func (self *Queue) PeekWithTimeout(timeout int32) interface{} {
+func (self *Queue) PeekWithTimeout(timeout int) interface{} {
   for self.Empty() {
     self.TimeoutCond.Lock()
-    ret := self.TimeoutCond.WaitFor(time.Duration(timeout) * time.Microsecond)
+    ret := self.TimeoutCond.WaitFor(timeout)
     self.TimeoutCond.Unlock()
     if !ret {
       return nil

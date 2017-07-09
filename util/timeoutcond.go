@@ -8,15 +8,24 @@ import (
 )
 
 type TimeoutCond struct {
-  locker  sync.Locker
+  locker sync.Locker
+  mutex sync.Mutex
   channel chan bool
 }
 
-func NewTimeoutCond(l sync.Locker) *TimeoutCond {
+func NewTimeoutCondWithMutex(l sync.Locker) *TimeoutCond {
   return &TimeoutCond{
     channel: make(chan bool),
     locker:  l,
   }
+}
+
+func NewTimeoutCond() *TimeoutCond {
+  cond := &TimeoutCond{
+    channel: make(chan bool),
+  }
+  cond.locker = cond.mutex
+  return cond
 }
 
 func (t *TimeoutCond) Lock() {
@@ -33,21 +42,14 @@ func (t *TimeoutCond) Wait() {
   t.locker.Lock()
 }
 
-func (t *TimeoutCond) WaitFor(d time.Duration) bool {
-  tmo := time.NewTimer(d)
+func (t *TimeoutCond) WaitFor(ms int) bool {
   t.locker.Unlock()
   var r bool
   select {
-  case <-tmo.C:
+  case <- time.After(time.Millisecond * time.Duration(ms)):
     r = false
   case <-t.channel:
     r = true
-  }
-  if !tmo.Stop() {
-    select {
-    case <-tmo.C:
-    default:
-    }
   }
   t.locker.Lock()
   return r

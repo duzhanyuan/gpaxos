@@ -28,13 +28,13 @@ func NewCommitContext(config *config.Config) *CommitContext {
     Config:config,
     Value:nil,
   }
-  context.Serialock = util.NewTimeoutCond(context.Mutext)
-  context.NewCommitContext(nil, nil, 0)
+  context.Serialock = util.NewTimeoutCondWithMutex()
+  context.NewCommit(nil, nil, 0)
 
   return context
 }
 
-func (self *CommitContext)NewCommitContext(value []byte, context *gpaxos.StateMachineContext, timeout uint64) {
+func (self *CommitContext) NewCommit(value []byte, context *gpaxos.StateMachineContext, timeout uint64) {
   self.Mutext.Lock()
 
   self.InstanceId = common.INVALID_INSTANCEID
@@ -113,7 +113,7 @@ func (self *CommitContext) SetResult(commitret error, instanceId uint64, learnVa
 
 func (self *CommitContext) GetResult(succInstanceId *uint64) error {
   for !self.IsCommitEnd {
-    self.Serialock.WaitFor(1000 * time.Microsecond)
+    self.Serialock.WaitFor(1000)
   }
 
   if self.CommitRet == nil {

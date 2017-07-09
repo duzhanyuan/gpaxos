@@ -16,14 +16,14 @@ func lockAndSignal(t *TimeoutCond) {
 func waitAndPrint(t *TimeoutCond, i int) {
   t.Lock()
   fmt.Println("Goroutine", i, "waiting...")
-  ok := t.WaitFor(10 * time.Second)
+  ok := t.WaitFor(10)
   t.Unlock()
   fmt.Println("This is goroutine", i, "ok:", ok)
 }
 
 func TestTimeoutCond(test *testing.T) {
   var m sync.Mutex
-  t := NewTimeoutCond(&m)
+  t := NewTimeoutCondWithMutex(&m)
 
   // Simple wait
   t.Lock()
@@ -34,7 +34,7 @@ func TestTimeoutCond(test *testing.T) {
 
   // Wait that times out
   t.Lock()
-  ok := t.WaitFor(100 * time.Millisecond)
+  ok := t.WaitFor(100)
   t.Unlock()
   fmt.Println("Timeout wait finished. Timeout:", !ok)
 
@@ -52,7 +52,7 @@ func TestTimeoutCond(test *testing.T) {
 func TestWaitforLock(t *testing.T) {
   var mutex sync.Mutex
 
-  lock := NewTimeoutCond(&mutex)
+  lock := NewTimeoutCondWithMutex(&mutex)
 
   now := NowTimeMs()
   end := false
@@ -73,7 +73,7 @@ func TestWaitforLock(t *testing.T) {
     time.Sleep(time.Millisecond * 100)
   }
 
-  for !end && !lock.WaitFor(100 * time.Millisecond) {
+  for !end && !lock.WaitFor(100) {
   }
 
   fmt.Printf("diff: %d", NowTimeMs() - now)

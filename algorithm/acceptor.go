@@ -1,6 +1,5 @@
 package algorithm
 
-import "github.com/lichuang/gpaxos/logstorage"
 
 import (
   "github.com/golang/protobuf/proto"
@@ -8,6 +7,7 @@ import (
   "github.com/lichuang/gpaxos/config"
   "github.com/lichuang/gpaxos/common"
   "github.com/lichuang/gpaxos/log"
+  "github.com/lichuang/gpaxos/logstorage"
   "github.com/lichuang/gpaxos/util"
 )
 
