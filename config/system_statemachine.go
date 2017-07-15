@@ -68,7 +68,8 @@ func (self *SystemStateMachine) UpdateSystemVariables(variables *common.SystemVa
   return nil
 }
 
-func (self *SystemStateMachine) Execute(groupIdx int32, instanceId uint64, value []byte, ctx *gpaxos.StateMachineContext) error {
+func (self *SystemStateMachine) Execute(groupIdx int32, instanceId uint64, value []byte,
+  ctx *gpaxos.StateMachineContext) error {
   var variables common.SystemVariables
   err := proto.Unmarshal(value, &variables)
   if err != nil {
@@ -219,18 +220,13 @@ func (self *SystemStateMachine) IsIMInMembership() bool {
   return exist
 }
 
-func (self *SystemStateMachine) GetCheckpointBuffer(buffer []byte) error {
+func (self *SystemStateMachine) GetCheckpointBuffer() ([]byte, error) {
   if self.systemVariables.GetVersion() == uint64(-1) ||
     self.systemVariables.GetGid() == 0 {
-    return nil
+    return nil, nil
   }
 
-  buffer, err := proto.Marshal(self.systemVariables)
-  if err != nil {
-    return err
-  }
-
-  return nil
+  return proto.Marshal(self.systemVariables)
 }
 
 func (self *SystemStateMachine) GetSystemVariables(variables *common.SystemVariables) {

@@ -7,7 +7,7 @@ import (
 type InsideStateMachine interface {
   gpaxos.StateMachine
 
-  GetCheckpointBuffer(buffer []byte) error
+  GetCheckpointBuffer()([]byte, error)
 
   UpdateByCheckpoint(buffer []byte, change *bool) error
 }

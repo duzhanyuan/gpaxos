@@ -6,10 +6,11 @@ import (
 )
 
 type Config struct {
-  IsFollower bool
-  FollowToNodeId uint64
-  SystemStateMachine *SystemStateMachine
-  MyFollowerMap map[uint64]uint64
+  isFollower         bool
+  followToNodeId     uint64
+  systemStateMachine *SystemStateMachine
+  masterStateMachine *MasterStateMachine
+  myFollowerMaps     map[uint64]uint64
 }
 
 func (self *Config) LogSync() bool {
@@ -41,19 +42,19 @@ func (self *Config) GetNodeCount() int {
 }
 
 func (self *Config) IsIMFollower() bool {
-  return self.IsFollower
+  return self.isFollower
 }
 
 func (self *Config) GetFollowToNodeID() uint64 {
-  return self.FollowToNodeId
+  return self.followToNodeId
 }
 
 func (self *Config) GetMyFollowerCount() int32 {
-  return int32(len(self.MyFollowerMap))
+  return int32(len(self.myFollowerMaps))
 }
 
 func (self *Config) AddFollowerNode(followerNodeId uint64) {
-  self.MyFollowerMap[followerNodeId] = util.NowTimeMs() + uint64(common.GetAskforLearnInterval() * 3)
+  self.myFollowerMaps[followerNodeId] = util.NowTimeMs() + uint64(common.GetAskforLearnInterval() * 3)
 }
 
 func (self *Config) AddTmpNodeOnlyForLearn(nodeId uint64) {
@@ -61,7 +62,11 @@ func (self *Config) AddTmpNodeOnlyForLearn(nodeId uint64) {
 }
 
 func (self *Config) GetSystemVSM() *SystemStateMachine {
-  return self.SystemStateMachine
+  return self.systemStateMachine
+}
+
+func (self *Config) GetMasterSM() *MasterStateMachine {
+  return self.masterStateMachine
 }
 
 func (self *Config) CheckConfig() bool {

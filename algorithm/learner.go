@@ -33,8 +33,8 @@ type Learner struct {
 }
 
 func NewLearner(config *config.Config, transport common.MsgTransport,
-  instance *Instance, acceptor *Acceptor,
-  storage logstorage.LogStorage, thread *IOThread, manager *checkpoint.CheckpointManager,
+  instance *Instance, acceptor *Acceptor, storage logstorage.LogStorage,
+  thread *IOThread, manager *checkpoint.CheckpointManager,
   factory *sm_base.StateMachineFactory) *Learner {
   learner := &Learner{
     Base:                             newBase(config, transport, instance),
@@ -184,13 +184,18 @@ func (self *Learner) SendNowInstanceID(instanceId uint64, sendNodeId uint64) {
   }
 
   if self.GetInstanceId()-instanceId > 50 {
-    var systemVarBuffer []byte
-    err := self.config.GetSystemVSM().GetCheckpointBuffer(systemVarBuffer)
+    systemVarBuffer, err := self.config.GetSystemVSM().GetCheckpointBuffer()
     if err == nil {
-      msg.SystemVariables = systemVarBuffer
+      msg.SystemVariables = util.CopyBytes(systemVarBuffer)
     }
 
+    masterVarBuffer, err := self.config.GetMasterSM().GetCheckpointBuffer()
+    if err == nil {
+      msg.MasterVariables = util.CopyBytes(masterVarBuffer)
+    }
   }
+
+  self.SendPaxosMessage(sendNodeId, msg, common.Message_SendType_UDP)
 }
 
 func (self *Learner) SendLearnValue(sendNodeId uint64, learnInstanceId uint64,
@@ -258,6 +263,8 @@ func (self *Learner) SendLearnValue_Ack(sendNodeId uint64) {
   }
 
   self.SendPaxosMessage(sendNodeId, msg, common.Message_SendType_UDP)
+
+  log.Info("END.OK")
 }
 
 func (self *Learner) OnSendLearnValue_Ack(msg *common.PaxosMsg) {
@@ -266,7 +273,7 @@ func (self *Learner) OnSendLearnValue_Ack(msg *common.PaxosMsg) {
 }
 
 func (self *Learner) TransmitToFollower() {
-  if self.config.GetFollowToNodeID() == 0 {
+  if self.config.GetMyFollowerCount() == 0 {
     return
   }
 
@@ -281,10 +288,11 @@ func (self *Learner) TransmitToFollower() {
   }
 
   self.BroadcastMessageToFollower(msg, common.Message_SendType_TCP)
+
+  log.Info("OK")
 }
 
 func (self *Learner) ProposerSendSuccess(learnInstanceId uint64, proposerId uint64) {
-
   msg := common.PaxosMsg{
     MsgType:      proto.Int32(common.MsgType_PaxosLearner_ProposerSendSuccess),
     InstanceID:   proto.Uint64(learnInstanceId),
@@ -328,6 +336,8 @@ func (self *Learner) OnProposerSendSuccess(msg *common.PaxosMsg) {
 }
 
 func (self *Learner) AskforCheckpoint(sendNodeId uint64) {
+  log.Info("start")
+
   err := self.CpMng.PrepareForAskforCheckpoint(sendNodeId)
   if err != nil {
     return
@@ -338,6 +348,8 @@ func (self *Learner) AskforCheckpoint(sendNodeId uint64) {
     NodeID:     proto.Uint64(self.config.GetMyNodeId()),
     MsgType:    proto.Int32(common.MsgType_PaxosLearner_AskforCheckpoint),
   }
+
+  log.Info("END InstanceID %d MyNodeID %d", self.GetInstanceId(), msg.GetNodeID())
 
   self.SendPaxosMessage(sendNodeId, msg, common.Message_SendType_UDP)
 }
@@ -429,7 +441,7 @@ func (self *Learner) OnSendCheckpoint_Ing(msg common.CheckpointMsg) error {
 func (self *Learner) OnSendCheckpoint_End(msg common.CheckpointMsg) error {
   if !self.CheckpointReceiver.IsReceiverFinish(msg.GetNodeID(), msg.GetUUID(), msg.GetSequence()) {
     log.Error("receive end msg but receiver not finish")
-    return errors.New("")
+    return errors.New("receive end msg but receiver not finish")
   }
 
   stateMachines := self.SMFactory.GetStateMachines()
@@ -538,10 +550,63 @@ func (self *Learner) OnSendNowInstanceID(msg *common.PaxosMsg) {
 
   self.SetSeenInstanceID(msg.GetNowInstanceID(), msg.GetNodeID())
 
-  bSystemVariablesChange := false
-  self.config.GetSystemVSM()
+  systemVariablesChange := false
+  err := self.config.GetSystemVSM().UpdateByCheckpoint(msg.GetSystemVariables(), &systemVariablesChange)
+  if err == nil && systemVariablesChange {
+    log.Info("SystemVariables changed!, all thing need to reflesh, so skip this msg")
+    return
+  }
+
+  masterVariablesChange := false
+  if self.config.GetMasterSM() != nil {
+    err = self.config.GetMasterSM().UpdateByCheckpoint(msg.GetMasterVariables(), &masterVariablesChange)
+    if err == nil && systemVariablesChange {
+      log.Info("mastervariables changed!, all thing need to reflesh, so skip this msg")
+    }
+  }
+
+  if msg.GetInstanceID() != self.GetInstanceId() {
+    log.Error("lag msg,skip")
+    return
+  }
+
+  if msg.GetNowInstanceID() <= self.GetInstanceId() {
+    log.Error("lag msg,skip")
+    return
+  }
+
+  if msg.GetMinChosenInstanceID() > self.GetInstanceId() {
+    log.Info("my instanceid %d small than other's minchoseninstanceid %d, other nodeid %d",
+      self.instanceId, msg.GetMinChosenInstanceID(), msg.GetNodeID())
+    self.AskforCheckpoint(msg.GetNodeID())
+  } else if !self.IsImLearning {
+    self.ConfirmAskForLearn(msg.GetNodeID())
+  }
 }
 
-func (self *Learner) OnComfirmAskForLearn(msg *common.PaxosMsg) {
+func (self *Learner) ConfirmAskForLearn(sendNodeId uint64) {
+  log.Info("start")
 
+  msg := common.PaxosMsg{
+    InstanceID:proto.Uint64(self.GetInstanceId()),
+    NodeID:proto.Uint64(self.config.GetMyNodeId()),
+    MsgType:proto.Int32(common.MsgType_PaxosLearner_ComfirmAskforLearn),
+  }
+
+  log.Info("END InstanceID %d MyNodeID %d", self.GetInstanceId(), msg.GetNodeID())
+
+  self.SendPaxosMessage(sendNodeId, msg, common.Message_SendType_UDP)
+
+  self.IsImLearning = true
+}
+
+func (self *Learner) OnConfirmAskForLearn(msg *common.PaxosMsg) {
+  log.Info("START Msg.InstanceID %d Msg.from_nodeid %d", msg.GetInstanceID(), msg.GetNodeID())
+
+  if !self.LearnerSender.Confirm(msg.GetInstanceID(), msg.GetNodeID()) {
+    log.Error("LearnerSender comfirm fail, maybe is lag msg")
+    return
+  }
+
+  log.Info("OK, success confirm")
 }
