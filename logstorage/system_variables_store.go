@@ -10,6 +10,12 @@ type SystemVariablesStore struct {
   LogStorage LogStorage
 }
 
+func NewSystemVariablesStore(storage LogStorage) *SystemVariablesStore {
+  return &SystemVariablesStore{
+    LogStorage:storage,
+  }
+}
+
 func (self *SystemVariablesStore) Write(options WriteOptions, groupIdx int32, variables *common.SystemVariables) error {
   buf, err := proto.Marshal(variables)
   if err != nil {
@@ -29,7 +35,7 @@ func (self *SystemVariablesStore) Write(options WriteOptions, groupIdx int32, va
 
 func (self *SystemVariablesStore) Read(groupIdx int32, variables *common.SystemVariables) error {
   var buffer []byte
-  err := self.LogStorage.GetSystemVariables(groupIdx, &buffer)
+  err := self.LogStorage.GetSystemVariables(groupIdx, buffer)
   if err != nil {
     log.Error("db.get fail, groupidx %d err:%v", groupIdx, err)
     return err

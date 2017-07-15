@@ -532,7 +532,14 @@ func (self *Learner) GetNewCheckpointSender(sendNodeId uint64) *CheckpointSender
 }
 
 func (self *Learner) OnSendNowInstanceID(msg *common.PaxosMsg) {
+  log.Info("START Msg.InstanceID %d Now.InstanceID %d Msg.from_nodeid %d Msg.MaxInstanceID %lu systemvariables_size %d mastervariables_size %d",
+    msg.GetInstanceID(), self.GetInstanceId(), msg.GetNodeID(), msg.GetNowInstanceID(),
+    len(msg.GetSystemVariables()), len(msg.GetMasterVariables()))
 
+  self.SetSeenInstanceID(msg.GetNowInstanceID(), msg.GetNodeID())
+
+  bSystemVariablesChange := false
+  self.config.GetSystemVSM()
 }
 
 func (self *Learner) OnComfirmAskForLearn(msg *common.PaxosMsg) {
