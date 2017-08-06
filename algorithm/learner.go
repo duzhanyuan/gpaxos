@@ -281,8 +281,8 @@ func (self *Learner) TransmitToFollower() {
     MsgType:        proto.Int32(common.MsgType_PaxosLearner_SendLearnValue),
     InstanceID:     proto.Uint64(self.GetInstanceId()),
     NodeID:         proto.Uint64(self.config.GetMyNodeId()),
-    ProposalNodeID: proto.Uint64(self.Acceptor.GetAcceptorState().AcceptedNum.nodeId),
-    ProposalID:     proto.Uint64(self.Acceptor.GetAcceptorState().AcceptedNum.proposalId),
+    ProposalNodeID: proto.Uint64(self.Acceptor.GetAcceptorState().acceptedNum.nodeId),
+    ProposalID:     proto.Uint64(self.Acceptor.GetAcceptorState().acceptedNum.proposalId),
     Value:          self.Acceptor.GetAcceptorState().GetAcceptedValue(),
     LastChecksum:   proto.Uint32(self.GetLastChecksum()),
   }
@@ -308,21 +308,21 @@ func (self *Learner) OnProposerSendSuccess(msg *common.PaxosMsg) {
   log.Info("START Msg.InstanceID %d Now.InstanceID %d Msg.ProposalID %d "+
     "State.AcceptedID %d State.AcceptedNodeID %d, Msg.from_nodeid %d",
     msg.GetInstanceID(), self.GetInstanceId(), msg.GetProposalID(),
-    self.Acceptor.GetAcceptorState().AcceptedNum.proposalId,
-    self.Acceptor.GetAcceptorState().AcceptedNum.nodeId,
+    self.Acceptor.GetAcceptorState().acceptedNum.proposalId,
+    self.Acceptor.GetAcceptorState().acceptedNum.nodeId,
     msg.GetNodeID())
 
   if msg.GetInstanceID() != self.GetInstanceId() {
     return
   }
 
-  if self.Acceptor.GetAcceptorState().AcceptedNum.IsNull() {
+  if self.Acceptor.GetAcceptorState().acceptedNum.IsNull() {
     log.Debug("not accepted any proposal")
     return
   }
 
   ballot := newBallotNumber(msg.GetProposalID(), msg.GetProposalNodeID())
-  if !self.Acceptor.GetAcceptorState().AcceptedNum.EQ(ballot) {
+  if !self.Acceptor.GetAcceptorState().acceptedNum.EQ(ballot) {
     log.Debug("proposal ballot not same to accepted ballot")
     return
   }

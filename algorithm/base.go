@@ -7,6 +7,7 @@ import (
   "github.com/lichuang/gpaxos/common"
   "github.com/lichuang/gpaxos/log"
   "github.com/lichuang/gpaxos/util"
+  "encoding/binary"
 )
 
 const (
@@ -15,9 +16,9 @@ const (
   BroadcastMessage_Type_RunSelf_None
 )
 
-var GROUPIDXLEN int32 = 8
-var HEADLEN_LEN int32 = 4
-var CHECKSUM_LEN int32 = 8
+var GROUPIDXLEN int32 = int32(binary.Size(int32(0)))
+var HEADLEN_LEN int32 = int32(binary.Size(uint16(0)))
+var CHECKSUM_LEN int32 = int32(binary.Size(uint32(0)))
 
 type Base struct {
   instanceId uint64
@@ -28,9 +29,9 @@ type Base struct {
 }
 
 func init() {
-  GROUPIDXLEN = int32(util.INT32SIZE)
-  HEADLEN_LEN = int32(util.UINT16SIZE)
-  CHECKSUM_LEN = int32(util.UINT32SIZE)
+  GROUPIDXLEN = int32(binary.Size(int32(0)))
+  HEADLEN_LEN = int32(binary.Size(uint16(0)))
+  CHECKSUM_LEN = int32(binary.Size(uint32(0)))
 }
 
 func newBase(config *config.Config, transport common.MsgTransport, instance *Instance) Base {
@@ -59,7 +60,7 @@ func (self *Base) GetLastChecksum() uint32 {
   return self.instance.GetLastChecksum()
 }
 
-func (self *Base) PackPaxosMsg(paxosMsg common.PaxosMsg, buffer []byte) error {
+func (self *Base) PackPaxosMsg(paxosMsg *common.PaxosMsg, buffer []byte) error {
   body, err := proto.Marshal(paxosMsg)
   if err != nil {
     log.Error("paxos msg Marshal fail:%v", err)
@@ -69,7 +70,7 @@ func (self *Base) PackPaxosMsg(paxosMsg common.PaxosMsg, buffer []byte) error {
   return self.PackBaseMsg(body, common.MsgCmd_PaxosMsg, buffer)
 }
 
-func (self *Base) PackCheckpointMsg(msg common.CheckpointMsg, buffer []byte) error {
+func (self *Base) PackCheckpointMsg(msg *common.CheckpointMsg, buffer []byte) error {
   body, err := proto.Marshal(msg)
   if err != nil {
     log.Error("checkpoint msg Marshal fail:%v", err)
@@ -79,6 +80,7 @@ func (self *Base) PackCheckpointMsg(msg common.CheckpointMsg, buffer []byte) err
   return self.PackBaseMsg(body, common.MsgCmd_CheckpointMsg, buffer)
 }
 
+// format: groupid + headerlen + header + body + crc32 checksum
 func (self *Base) PackBaseMsg(body []byte, cmd int32, buffer []byte) error {
   groupIdx := self.config.GetMyGroupIdx()
   groupIdBuf := make([]byte, GROUPIDXLEN)
@@ -114,7 +116,7 @@ func (self *Base) UnpackBaseMsg(buffer []byte, header *common.Header, bodyStartP
   return UnpackBaseMsg(buffer, header, bodyStartPos, bodyLen)
 }
 
-func (self *Base) SendCheckpointMessage(sendToNodeid uint64, msg common.CheckpointMsg, sendType int) error {
+func (self *Base) SendCheckpointMessage(sendToNodeid uint64, msg *common.CheckpointMsg, sendType int) error {
   if sendToNodeid == self.config.GetMyNodeId() {
     return nil
   }
@@ -128,7 +130,7 @@ func (self *Base) SendCheckpointMessage(sendToNodeid uint64, msg common.Checkpoi
   return self.transport.SendMessage(sendToNodeid, buffer, sendType)
 }
 
-func (self *Base) SendPaxosMessage(sendToNodeid uint64, msg common.PaxosMsg, sendType int) error {
+func (self *Base) SendPaxosMessage(sendToNodeid uint64, msg *common.PaxosMsg, sendType int) error {
   if sendToNodeid == self.config.GetMyNodeId() {
     return nil
   }
@@ -142,13 +144,13 @@ func (self *Base) SendPaxosMessage(sendToNodeid uint64, msg common.PaxosMsg, sen
   return self.transport.SendMessage(sendToNodeid, buffer, sendType)
 }
 
-func (self *Base) BroadcastMessage(msg common.PaxosMsg, runType int, sendType int) error {
+func (self *Base) BroadcastMessage(msg *common.PaxosMsg, runType int, sendType int) error {
   if self.isTestNode {
     return nil
   }
 
   if runType == BroadcastMessage_Type_RunSelf_First {
-    err := self.instance.OnReceivePaxosMsg(msg)
+    err := self.instance.OnReceivePaxosMsg(msg, false)
     if err != nil {
       return err
     }
@@ -163,13 +165,13 @@ func (self *Base) BroadcastMessage(msg common.PaxosMsg, runType int, sendType in
   err = self.transport.BroadcastMessage(buffer, sendType)
 
   if runType == BroadcastMessage_Type_RunSelf_Final {
-    self.instance.OnReceivePaxosMsg(msg)
+    self.instance.OnReceivePaxosMsg(msg, false)
   }
 
   return err
 }
 
-func (self *Base) BroadcastMessageToFollower(msg common.PaxosMsg, sendType int) error {
+func (self *Base) BroadcastMessageToFollower(msg *common.PaxosMsg, sendType int) error {
   var buffer []byte
   err := self.PackPaxosMsg(msg, buffer)
   if err != nil {
@@ -179,7 +181,7 @@ func (self *Base) BroadcastMessageToFollower(msg common.PaxosMsg, sendType int) 
   return self.transport.BroadcastMessageFollower(buffer, sendType)
 }
 
-func (self *Base) BroadcastMessageToTempNode(msg common.PaxosMsg, sendType int) error {
+func (self *Base) BroadcastMessageToTempNode(msg *common.PaxosMsg, sendType int) error {
   var buffer []byte
   err := self.PackPaxosMsg(msg, buffer)
   if err != nil {

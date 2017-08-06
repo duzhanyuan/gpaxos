@@ -10,8 +10,8 @@ import (
 )
 
 type AcceptorState struct {
-  promiseNum   BallotNumber
-  acceptedNum  BallotNumber
+  promiseNum   *BallotNumber
+  acceptedNum  *BallotNumber
   acceptValues []byte
   checkSum     uint32
   paxosLog     *logstorage.PaxosLog
@@ -36,19 +36,19 @@ func (self *AcceptorState) init() {
   self.acceptValues = []byte("")
 }
 
-func (self *AcceptorState) GetPromiseNum() BallotNumber {
+func (self *AcceptorState) GetPromiseNum() *BallotNumber {
   return self.promiseNum
 }
 
-func (self *AcceptorState) SetPromiseNum(promiseNum BallotNumber) {
+func (self *AcceptorState) SetPromiseNum(promiseNum *BallotNumber) {
   self.promiseNum = promiseNum
 }
 
-func (self *AcceptorState) GetAcceptedNum() BallotNumber {
+func (self *AcceptorState) GetAcceptedNum() *BallotNumber {
   return self.acceptedNum
 }
 
-func (self *AcceptorState) SetAcceptedNum(acceptedNum BallotNumber) {
+func (self *AcceptorState) SetAcceptedNum(acceptedNum *BallotNumber) {
   self.acceptedNum = acceptedNum
 }
 
