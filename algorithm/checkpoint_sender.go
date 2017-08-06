@@ -19,36 +19,36 @@ const (
 )
 
 type CheckpointSender struct {
-  SendNodeId           uint64
-  Config               *config.Config
-  Learner              *Learner
-  Factory              *sm_base.StateMachineFactory
-  CpMng                *checkpoint.CheckpointManager
-  isEnd                bool
-  IsEnded              bool
-  UUID                 uint64
-  Sequence             uint64
-  AckSequence          uint64
-  AbsLastAckTime       uint64
-  AlreadySendedFileMap map[string]bool
-  TmpBuffer []byte
+  sendNodeId            uint64
+  config                *config.Config
+  Learner               *Learner
+  factory               *sm_base.StateMachineFactory
+  cpMng                 *checkpoint.CheckpointManager
+  isEnd                 bool
+  isEnded               bool
+  uuid                  uint64
+  sequence              uint64
+  ackSequence           uint64
+  absLastAckTime        uint64
+  alreadySendedFileMaps map[string]bool
+  tmpBuffers            []byte
 }
 
 func NewCheckpointSender(sendNodeId uint64, config *config.Config, learner *Learner,
                          factory *sm_base.StateMachineFactory, cpmng *checkpoint.CheckpointManager) *CheckpointSender {
   return &CheckpointSender{
-    SendNodeId:sendNodeId,
-    Config:config,
-    Learner:learner,
-    Factory:factory,
-    CpMng:cpmng,
-    UUID:(config.GetMyNodeId() ^ learner.GetInstanceId()) + uint64(util.Rand()),
-    TmpBuffer:make([] byte, 1048576),
+    sendNodeId: sendNodeId,
+    config:     config,
+    Learner:    learner,
+    factory:    factory,
+    cpMng:      cpmng,
+    uuid:       (config.GetMyNodeId() ^ learner.GetInstanceId()) + uint64(util.Rand()),
+    tmpBuffers: make([] byte, 1048576),
   }
 }
 
 func (self *CheckpointSender) Stop() {
-  if !self.IsEnded {
+  if !self.isEnded {
     self.isEnd = true
   }
 }
@@ -58,17 +58,18 @@ func (self CheckpointSender) Start() {
 }
 
 func (self *CheckpointSender) main() {
-  self.AbsLastAckTime = util.NowTimeMs()
+  self.absLastAckTime = util.NowTimeMs()
   needContinue := false
+  replayer := self.cpMng.GetReplayer()
 
-  for !self.CpMng.replayer.IsPause {
+  for !replayer.IsPause {
     if self.isEnd {
-      self.IsEnded = true
+      self.isEnded = true
       return
     }
 
     needContinue = true
-    self.CpMng.replayer.Pause()
+    replayer.Pause()
     log.Debug("wait replayer paused")
     time.Sleep(time.Microsecond * 100)
   }
@@ -80,15 +81,15 @@ func (self *CheckpointSender) main() {
   }
 
   if needContinue {
-    self.CpMng.replayer.Continue()
+    replayer.Continue()
   }
 
   log.Info("Checkpoint.Sender [END]")
-  self.IsEnded = true
+  self.isEnded = true
 }
 
 func (self *CheckpointSender) LockCheckpoint() error {
-  stateMachines := self.Factory.StateMachines
+  stateMachines := self.factory.GetStateMachines()
 
   lockStateMachines := make([]gpaxos.StateMachine, 0)
   var err error
@@ -111,41 +112,41 @@ func (self *CheckpointSender) LockCheckpoint() error {
 }
 
 func (self *CheckpointSender) UnLockCheckpoint() {
-  for _, statemachine := range self.Factory.StateMachines {
+  for _, statemachine := range self.factory.GetStateMachines() {
     statemachine.UnLockCheckpointState()
   }
 }
 
 func (self *CheckpointSender) SendCheckpoint() {
-  err := self.Learner.SendCheckpointBegin(self.SendNodeId, self.UUID, self.Sequence,
-    self.Factory.GetCheckpointInstanceID(self.Config.GetMyGroupIdx()))
+  err := self.Learner.SendCheckpointBegin(self.sendNodeId, self.uuid, self.sequence,
+    self.factory.GetCheckpointInstanceID(self.config.GetMyGroupIdx()))
 
   if err != nil {
     log.Error("SendCheckpointBegin fail: %v", err)
     return
   }
 
-  self.Sequence++
+  self.sequence++
 
-  for _, statemachine := range self.Factory.StateMachines {
-    err := self.SendCheckpointFofaSM(statemachine)
+  for _, statemachine := range self.factory.GetStateMachines() {
+    err := self.SendCheckpointForStatemachine(statemachine)
     if err != nil {
       return
     }
   }
 
-  err = self.Learner.SendCheckpointEnd(self.SendNodeId, self.UUID, self.Sequence,
-    self.Factory.GetCheckpointInstanceID(self.Config.GetMyGroupIdx()))
+  err = self.Learner.SendCheckpointEnd(self.sendNodeId, self.uuid, self.sequence,
+    self.factory.GetCheckpointInstanceID(self.config.GetMyGroupIdx()))
   if err != nil {
-    log.Error("SendCheckpointEnd fail %v, sequence %d", err, self.Sequence)
+    log.Error("SendCheckpointEnd fail %v, sequence %d", err, self.sequence)
   }
 }
 
-func (self *CheckpointSender) SendCheckpointFofaSM(statemachine gpaxos.StateMachine) error {
+func (self *CheckpointSender) SendCheckpointForStatemachine(statemachine gpaxos.StateMachine) error {
   var dirPath string
   fileList := make([]string, 0)
 
-  err := statemachine.GetCheckpointState(self.Config.GetMyGroupIdx(), &dirPath, fileList)
+  err := statemachine.GetCheckpointState(self.config.GetMyGroupIdx(), &dirPath, fileList)
   if err != nil {
     log.Error("GetCheckpointState fail %v, smid %d", err, statemachine.SMID())
     return err
@@ -176,7 +177,7 @@ func (self *CheckpointSender) SendFile(stateMachine gpaxos.StateMachine, dirPath
   log.Info("START smid %d dirpath %s filepath %s", stateMachine.SMID(), dirPath, filePath)
   path := dirPath + filePath
 
-  _, exist := self.AlreadySendedFileMap[path]
+  _, exist := self.alreadySendedFileMaps[path]
   if exist {
     log.Error("file already send, filepath %s", path)
     return nil
@@ -191,7 +192,7 @@ func (self *CheckpointSender) SendFile(stateMachine gpaxos.StateMachine, dirPath
   var readLen int = 0
   var offset uint64 = 0
   for {
-    readLen, err = file.Read(self.TmpBuffer)
+    readLen, err = file.Read(self.tmpBuffers)
     if err != nil {
       file.Close()
       return err
@@ -201,22 +202,23 @@ func (self *CheckpointSender) SendFile(stateMachine gpaxos.StateMachine, dirPath
       break
     }
 
-    err = self.SendBuffer(stateMachine.SMID(), stateMachine.GetCheckpointInstanceID(self.Config.GetMyGroupIdx()),
-      filePath, offset, self.TmpBuffer[:readLen])
+    instanceId := stateMachine.GetCheckpointInstanceID(self.config.GetMyGroupIdx())
+    err = self.SendBuffer(stateMachine.SMID(), instanceId,
+      filePath, offset, self.tmpBuffers[:readLen])
     if err != nil {
       file.Close()
       return err
     }
 
     log.Debug("Send ok, offset %d readlen %d", offset, readLen)
-    if readLen < len(self.TmpBuffer) {
+    if readLen < len(self.tmpBuffers) {
       break
     }
 
     offset += uint64(readLen)
   }
 
-  self.AlreadySendedFileMap[path] = true
+  self.alreadySendedFileMaps[path] = true
 
   file.Close()
   log.Info("end")
@@ -232,14 +234,14 @@ func (self *CheckpointSender) SendBuffer(smid int32, checkpointInstanceId uint64
       return errors.New("isend")
     }
 
-    if !self.CheckAck(self.Sequence) {
+    if !self.CheckAck(self.sequence) {
       return errors.New("checkack fail")
     }
 
-    err = self.Learner.SendCheckpoint(self.SendNodeId, self.UUID, self.Sequence, checkpointInstanceId,
+    err = self.Learner.SendCheckpoint(self.sendNodeId, self.uuid, self.sequence, checkpointInstanceId,
       cksum, filePath, smid, offset, buffer)
     if err == nil {
-      self.Sequence++
+      self.sequence++
       break
     } else {
       log.Error("SendCheckpoint fail %v need sleep 30s", err)
@@ -251,31 +253,31 @@ func (self *CheckpointSender) SendBuffer(smid int32, checkpointInstanceId uint64
 }
 
 func (self *CheckpointSender) Ack(sendNodeId uint64, uuid uint64, sequence uint64) {
-  if sendNodeId != self.SendNodeId {
-    log.Error("send nodeid not same, ack.sendnodeid %d self.sendnodeid %d", sendNodeId, self.SendNodeId)
+  if sendNodeId != self.sendNodeId {
+    log.Error("send nodeid not same, ack.sendnodeid %d self.sendnodeid %d", sendNodeId, self.sendNodeId)
     return
   }
 
-  if self.UUID != uuid {
-    log.Error("uuid not same, ack.uuid %d self.uuid %d", uuid, self.UUID)
+  if self.uuid != uuid {
+    log.Error("uuid not same, ack.uuid %d self.uuid %d", uuid, self.uuid)
     return
   }
 
-  if sequence != self.Sequence {
-    log.Error("ack_sequence not same, ack.ack_sequence %d self.ack_sequence %d", sequence, self.Sequence)
+  if sequence != self.sequence {
+    log.Error("ack_sequence not same, ack.ack_sequence %d self.ack_sequence %d", sequence, self.sequence)
     return
   }
 
-  self.AckSequence++
-  self.AbsLastAckTime = util.NowTimeMs()
+  self.ackSequence++
+  self.absLastAckTime = util.NowTimeMs()
 }
 
 func (self *CheckpointSender) CheckAck(sendSequence uint64) bool {
-  for sendSequence < self.AckSequence + Checkpoint_ACK_LEAD {
+  for sendSequence < self.ackSequence + Checkpoint_ACK_LEAD {
     nowTime := util.NowTimeMs()
     var passTime uint64 = 0
-    if nowTime > self.AbsLastAckTime {
-      passTime = nowTime - self.AbsLastAckTime
+    if nowTime > self.absLastAckTime {
+      passTime = nowTime - self.absLastAckTime
     }
 
     if self.isEnd {
@@ -283,7 +285,7 @@ func (self *CheckpointSender) CheckAck(sendSequence uint64) bool {
     }
 
     if passTime >= Checkpoint_ACK_TIMEOUT {
-      log.Error("Ack timeout, last acktime %d", self.AbsLastAckTime)
+      log.Error("Ack timeout, last acktime %d", self.absLastAckTime)
       return false
     }
 

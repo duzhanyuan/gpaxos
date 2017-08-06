@@ -15,28 +15,28 @@ import (
 )
 
 type CheckpointReceiver struct {
-  Config        *config.Config
-  Logstorage    logstorage.LogStorage
-  SenderNodeId  uint64
-  UUID          uint64
-  Sequence      uint64
-  HasInitDirMap map[string]bool
+  config         *config.Config
+  logStorage     logstorage.LogStorage
+  senderNodeId   uint64
+  uuid           uint64
+  sequence       uint64
+  hasInitDirMaps map[string]bool
 }
 
 func NewCheckpointReceiver(config *config.Config, storage logstorage.LogStorage) *CheckpointReceiver {
   receiver := &CheckpointReceiver{
-    Config:     config,
-    Logstorage: storage,
+    config:     config,
+    logStorage: storage,
   }
   receiver.Reset()
   return receiver
 }
 
 func (self *CheckpointReceiver) Reset() {
-  self.HasInitDirMap = make(map[string]bool)
-  self.SenderNodeId = common.NULL_NODEID
-  self.UUID = 0
-  self.Sequence = 0
+  self.hasInitDirMaps = make(map[string]bool)
+  self.senderNodeId = common.NULL_NODEID
+  self.uuid = 0
+  self.sequence = 0
 }
 
 func (self *CheckpointReceiver) NewReceiver(senderNodeId uint64, uuid uint64) error {
@@ -44,21 +44,22 @@ func (self *CheckpointReceiver) NewReceiver(senderNodeId uint64, uuid uint64) er
     return errors.New("clear checkpoint tmp dir error")
   }
 
-  err := self.Logstorage.ClearAllLog(self.Config.GetMyGroupIdx())
+  err := self.logStorage.ClearAllLog(self.config.GetMyGroupIdx())
   if err != nil {
+    log.Error("ClearAllLog fail, groupidx %d ret %v", self.config.GetMyGroupIdx(), err)
     return err
   }
 
-  self.HasInitDirMap = make(map[string]bool)
-  self.SenderNodeId = senderNodeId
-  self.UUID = uuid
-  self.Sequence = 0
+  self.hasInitDirMaps = make(map[string]bool)
+  self.senderNodeId = senderNodeId
+  self.uuid = uuid
+  self.sequence = 0
 
   return nil
 }
 
 func (self *CheckpointReceiver) ClearCheckpointTmp() bool {
-  path := self.Logstorage.GetLogStorageDirPath(self.Config.GetMyGroupIdx())
+  path := self.logStorage.GetLogStorageDirPath(self.config.GetMyGroupIdx())
 
   if !util.IsDirectoryExist(path) {
     return false
@@ -79,8 +80,8 @@ func (self *CheckpointReceiver) ClearCheckpointTmp() bool {
 }
 
 func (self *CheckpointReceiver) IsReceiverFinish(senderNodeId uint64, uuid uint64, endSequence uint64) bool {
-  if senderNodeId == self.SenderNodeId &&
-    uuid == self.UUID && endSequence == self.Sequence+1 {
+  if senderNodeId == self.senderNodeId &&
+    uuid == self.uuid && endSequence == self.sequence+1 {
     return true
   }
 
@@ -88,7 +89,7 @@ func (self *CheckpointReceiver) IsReceiverFinish(senderNodeId uint64, uuid uint6
 }
 
 func (self *CheckpointReceiver) GetTmpDirPath(smid int32) string {
-  path := self.Logstorage.GetLogStorageDirPath(self.Config.GetMyGroupIdx())
+  path := self.logStorage.GetLogStorageDirPath(self.config.GetMyGroupIdx())
 
   return fmt.Sprintf("%s/cp_tmp_%d", path, smid)
 }
@@ -99,31 +100,30 @@ func (self *CheckpointReceiver) InitFilePath(path string, formatFilePath *string
   newFilePath := "/" + path + "/"
   dirList := make([]string, 0)
 
-  dirName := bytes.NewBufferString("")
-  i := 0
-  for i < len(newFilePath) {
+  dirName := ""
+  for i := 0;i < len(newFilePath);i++ {
     if newFilePath[i] == '/' {
-      dirList = append(dirList, dirName.String())
-      dirName = bytes.NewBufferString("")
+      dirList = append(dirList, dirName)
+      dirName = ""
     } else {
-      dirName.WriteByte(newFilePath[i])
+      dirName += string(newFilePath[i])
     }
   }
 
-  *formatFilePath = ""
+  *formatFilePath = "/"
   for i, dir := range (dirList) {
     if i+1 == len(dirList) {
       *formatFilePath += dir
     } else {
       *formatFilePath += dir + "/"
-      _, exist := self.HasInitDirMap[*formatFilePath]
+      _, exist := self.hasInitDirMaps[*formatFilePath]
       if !exist {
         err := self.CreateDir(*formatFilePath)
         if err != nil {
           return err
         }
 
-        self.HasInitDirMap[*formatFilePath] = true
+        self.hasInitDirMaps[*formatFilePath] = true
       }
     }
   }
@@ -140,20 +140,20 @@ func (self *CheckpointReceiver) CreateDir(path string) error {
   return nil
 }
 
-func (self *CheckpointReceiver) ReceiveCheckpoint(msg common.CheckpointMsg) error {
-  if msg.GetNodeID() != self.SenderNodeId || msg.GetUUID() != self.UUID {
-    log.Error("msg not valid, Msg.SenderNodeID %d Receiver.SenderNodeID %d Msg.UUID %d Receiver.UUID %d",
-      msg.GetNodeID(), self.SenderNodeId, msg.GetUUID(), self.UUID)
+func (self *CheckpointReceiver) ReceiveCheckpoint(msg *common.CheckpointMsg) error {
+  if msg.GetNodeID() != self.senderNodeId || msg.GetUUID() != self.uuid {
+    log.Error("msg not valid, Msg.SenderNodeID %d Receiver.SenderNodeID %d Msg.uuid %d Receiver.uuid %d",
+      msg.GetNodeID(), self.senderNodeId, msg.GetUUID(), self.uuid)
 
     return errors.New("error msg")
   }
 
-  if self.Sequence == msg.GetSequence() {
+  if self.sequence == msg.GetSequence() {
     return nil
   }
 
-  if msg.GetSequence() != self.Sequence+1 {
-    log.Error("msg seq wrong, msg.seq %d receiver.seq %d", msg.GetSequence(), self.Sequence)
+  if msg.GetSequence() != self.sequence+1 {
+    log.Error("msg seq wrong, msg.seq %d receiver.seq %d", msg.GetSequence(), self.sequence)
     return errors.New("error msg")
   }
 
@@ -184,7 +184,7 @@ func (self *CheckpointReceiver) ReceiveCheckpoint(msg common.CheckpointMsg) erro
     return errors.New("error msg")
   }
 
-  self.Sequence++
+  self.sequence++
   file.Close()
 
   log.Info("END ok, write len %d", n)

@@ -9,14 +9,14 @@ import (
 )
 
 type StateMachineFactory struct {
-  MyGroupIdx int32
-  StateMachines []gpaxos.StateMachine
+  myGroupIdx    int32
+  stateMachines []gpaxos.StateMachine
 }
 
 func NewStateMachineFactory(groupIdx int32) *StateMachineFactory {
   return &StateMachineFactory{
-    MyGroupIdx:groupIdx,
-    StateMachines:make([]gpaxos.StateMachine, 0),
+    myGroupIdx:    groupIdx,
+    stateMachines: make([]gpaxos.StateMachine, 0),
   }
 }
 
@@ -86,11 +86,11 @@ func (self *StateMachineFactory) DoExecute(groupIdx int32, instanceId uint64, bo
     return true
   }
 
-  if len(self.StateMachines) == 0 {
+  if len(self.stateMachines) == 0 {
     return false
   }
 
-  for _, statemachine := range self.StateMachines {
+  for _, statemachine := range self.stateMachines {
     if statemachine.SMID() != smid {
       continue
     }
@@ -152,11 +152,11 @@ func (self *StateMachineFactory)DoExecuteForCheckpoint(groupIdx int32, instanceI
     return true
   }
 
-  if len(self.StateMachines) == 0 {
+  if len(self.stateMachines) == 0 {
     return false
   }
 
-  for _, statemachine := range self.StateMachines {
+  for _, statemachine := range self.stateMachines {
     if statemachine.SMID() != smid {
       continue
     }
@@ -177,13 +177,13 @@ func (self *StateMachineFactory)PackPaxosValue(value[]byte, smid int32) []byte {
 }
 
 func (self *StateMachineFactory) AddStateMachine(stateMachine gpaxos.StateMachine) {
-  for _, sm := range(self.StateMachines) {
+  for _, sm := range(self.stateMachines) {
     if sm.SMID() == stateMachine.SMID() {
       return
     }
   }
 
-  self.StateMachines = append(self.StateMachines, stateMachine)
+  self.stateMachines = append(self.stateMachines, stateMachine)
 }
 
 func (self *StateMachineFactory) GetCheckpointInstanceID(groupIdx int32) uint64 {
@@ -191,7 +191,7 @@ func (self *StateMachineFactory) GetCheckpointInstanceID(groupIdx int32) uint64 
   cpinstanceId_insize := common.INVALID_INSTANCEID
   haveUseSm := false
 
-  for _, statemachine := range(self.StateMachines) {
+  for _, statemachine := range(self.stateMachines) {
     instanceId := statemachine.GetCheckpointInstanceID(groupIdx)
     smid := statemachine.SMID()
 
@@ -225,5 +225,5 @@ func (self *StateMachineFactory) GetCheckpointInstanceID(groupIdx int32) uint64 
 }
 
 func (self *StateMachineFactory) GetStateMachines() [] gpaxos.StateMachine{
-  return self.StateMachines
+  return self.stateMachines
 }
