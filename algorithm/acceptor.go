@@ -1,6 +1,5 @@
 package algorithm
 
-
 import (
   "github.com/golang/protobuf/proto"
 
@@ -18,12 +17,11 @@ type Acceptor struct {
 }
 
 func NewAcceptor(config *config.Config, transport common.MsgTransport, instance *Instance, storage logstorage.LogStorage) *Acceptor {
-  acceptor := new(Acceptor)
-  acceptor.Base = newBase(config, transport, instance)
-  acceptor.acceptorState = newAcceptorState(config, storage)
-  acceptor.config = config
-
-  return acceptor
+  return &Acceptor{
+    Base:          newBase(config, transport, instance),
+    acceptorState: newAcceptorState(config, storage),
+    config:        config,
+  }
 }
 
 func (self *Acceptor) Init() error {
@@ -40,7 +38,13 @@ func (self *Acceptor) Init() error {
 
   self.SetInstanceId(instanceId)
 
+  log.Info("OK")
+
   return nil
+}
+
+func (self *Acceptor) InitForNewPaxosInstance() {
+  self.acceptorState.init()
 }
 
 func (self *Acceptor) NewInstance() {
@@ -74,10 +78,11 @@ func (self *Acceptor) OnPrepare(msg *common.PaxosMsg) error {
     reply.PreAcceptNodeID = proto.Uint64(self.acceptorState.GetAcceptedNum().nodeId)
 
     if self.acceptorState.GetAcceptedNum().proposalId > 0 {
-      reply.Value = util.CopyBytes(self.acceptorState.AcceptValue)
+      reply.Value = util.CopyBytes(self.acceptorState.acceptValues)
     }
 
-    self.acceptorState.PromiseNum = ballot
+    self.acceptorState.SetPromiseNum(ballot)
+
     err := self.acceptorState.Persist(self.GetInstanceId(), self.GetLastChecksum())
     if err != nil {
       log.Error("persist fail, now instanceid %d ret %v", self.GetInstanceId(), err)
@@ -116,9 +121,9 @@ func (self *Acceptor) OnAccept(msg *common.PaxosMsg) error {
       self.acceptorState.GetPromiseNum().proposalId, self.acceptorState.GetPromiseNum().nodeId,
       self.acceptorState.GetAcceptedNum().proposalId, self.acceptorState.GetAcceptedNum().nodeId)
 
-    self.acceptorState.PromiseNum = ballot
-    self.acceptorState.AcceptedNum = ballot
-    self.acceptorState.AcceptValue = util.CopyBytes(msg.Value)
+    self.acceptorState.SetPromiseNum(ballot)
+    self.acceptorState.SetAcceptedNum(ballot)
+    self.acceptorState.SetAcceptedValue(msg.Value)
 
     err := self.acceptorState.Persist(self.GetInstanceId(), self.GetLastChecksum())
     if err != nil {
@@ -140,6 +145,3 @@ func (self *Acceptor) OnAccept(msg *common.PaxosMsg) error {
   return nil
 }
 
-func (self *Acceptor) InitForNewPaxosInstance() {
-  self.acceptorState.init()
-}
