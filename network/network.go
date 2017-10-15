@@ -2,9 +2,9 @@ package network
 
 import (
   "github.com/lichuang/gpaxos"
-  "fmt"
   "net"
   "strconv"
+  "github.com/lichuang/gpaxos/log"
 )
 
 type ConnectionHandler func(conn net.Conn)
@@ -42,7 +42,7 @@ func NewNetwork(options *gpaxos.Options, handler ConnectionHandler) *Network {
 func (self *Network) Send(msg, addr string) {
   conn, exist := self.connections[addr]
   if !exist {
-    fmt.Printf("%s not exist", addr)
+    log.Error("%s not exist", addr)
     return
   }
 
