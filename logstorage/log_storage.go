@@ -14,6 +14,25 @@ import (
   "math/rand"
 )
 
+/*
+  In leveldb, there are instance data index, the instance data itself
+  saved in file.
+
+  leveldb data:
+    key - instance
+    value format - fileid(int32)+file offset(uint64)+cksum of file value(uint32)
+
+  meta file format(data path/vpath/meta):
+    current file id(int32)
+    file id cksum(uint32)
+
+  data file(data path/vpath/fileid.f) data format:
+    data len(int32)
+    value(data len) format:
+      instance id(uint64)
+      acceptor state data(data len - sizeof(uint64))
+ */
+
 const MINCHOSEN_KEY = math.MaxUint64
 const SYSTEMVARIABLES_KEY = math.MaxUint64 - 1
 const MASTERVARIABLES_KEY = math.MaxUint64 - 2
@@ -177,6 +196,7 @@ func (self *LogStorage) GetFromLevelDb(instanceId uint64, value *[]byte) error {
     return common.ErrGetFail
   }
 
+  log.Info("ret:%v", string(ret))
   *value = ret
   return nil
 }
@@ -194,6 +214,7 @@ func (self *LogStorage) Get(instanceId uint64, value []byte) error {
   if err != nil {
     return err
   }
+  log.Info("ret:%v", string(fileId))
 
   var fileInstanceId uint64
   err = self.FileIdToValue(string(fileId), &fileInstanceId, value)

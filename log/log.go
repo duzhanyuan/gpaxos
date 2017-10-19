@@ -7,7 +7,7 @@ func Debug(format string, params ...interface{}) {
 }
 
 func Info(format string, params ...interface{}) {
-    fmt.Printf(format, params)
+    fmt.Printf(format + "\n", params)
 }
 
 func Error(format string, params ...interface{}) {

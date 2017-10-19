@@ -68,6 +68,10 @@ func (self *LogStore) Init(path string, db *LogStorage) error {
 
   self.fileLogger.Init(self.path)
 
+  // decode file id from meta file
+  // meta file format:
+  //  current file id(int32)
+  //  file id cksum(uint32)
   var metaFilePath = self.path + "/meta"
   metaFile, err := os.OpenFile(metaFilePath, os.O_CREATE|os.O_RDWR, os.ModePerm)
   if err != nil {
@@ -98,7 +102,7 @@ func (self *LogStore) Init(path string, db *LogStorage) error {
   if n == util.UINT32SIZE {
     util.DecodeUint32(buff, 0, &metaCkSum)
     if metaCkSum != ckSum {
-      return fmt.Errorf("meta file checksum %d not same to cal checksum %d, file id %d",
+      return fmt.Errorf("meta file checksum %d not same to calc checksum %d, file id %d",
         metaCkSum, ckSum, self.fileId)
     }
   }
@@ -330,6 +334,14 @@ func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer str
   ckSum := util.Crc32(0, tmpBuf[util.INT32SIZE:], common.CRC32_SKIP)
   self.EncodeFileId(fileId, uint64(offset), ckSum, fileIdStr)
 
+  {
+    var i int32
+    var o uint64
+    var c uint32
+    self.DecodeFileId(*fileIdStr, &i, &o, &c)
+    log.Info("c:%v", c)
+  }
+
   useMs := (util.NowTimeMs() - begin) / 1000000
 
   log.Info("ok, offset %d fileid %d cksum %d instanceid %d buffersize %d usetime %d ms sync %d",
@@ -440,7 +452,7 @@ func (self *LogStore) EncodeFileId(fileId int32, offset uint64, cksum uint32, fi
   buffer := make([]byte, util.INT32SIZE+util.UINT64SIZE+util.UINT32SIZE)
   util.EncodeInt32(buffer, 0, fileId)
   util.EncodeUint64(buffer, util.INT32SIZE, offset)
-  util.EncodeUint32(buffer, util.INT32SIZE+util.UINT32SIZE, cksum)
+  util.EncodeUint32(buffer, util.INT32SIZE+util.UINT64SIZE, cksum)
 
   *fileIdStr = string(buffer)
 }
@@ -461,11 +473,13 @@ func (self *LogStore) RebuildIndex(db *LogStorage, nowOffset *uint64) error {
   var lastFileId string
   var nowInstanceId uint64
 
+  // 1. get max instance id and file id from leveldb
   err := db.GetMaxInstanceIDFileID(&lastFileId, &nowInstanceId)
   if err != nil {
     return err
   }
 
+  // 2. decode last file id info
   var fileId int32
   var offset uint64
   var cksum uint32

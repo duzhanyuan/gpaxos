@@ -1,6 +1,7 @@
 package logstorage
 
 import (
+  "io/ioutil"
   "fmt"
   "testing"
 )
@@ -10,7 +11,8 @@ func Test_basic(t *testing.T) {
   testValue := "test"
   var testInstanceId uint64 = 111
 
-  db.Init("./tmp")
+  tmp, _ := ioutil.TempDir("/tmp", "gpaxos")
+  db.Init(tmp)
 
   err := db.Put(WriteOptions{}, testInstanceId, testValue)
   if err != nil {
@@ -18,13 +20,13 @@ func Test_basic(t *testing.T) {
     return
   }
 
-  var value string
-  err = db.Get(testInstanceId, &value)
+  var value []byte
+  err = db.Get(testInstanceId, value)
   if err != nil {
     fmt.Printf("get error: %v", err)
   }
 
-  if value != testValue {
+  if string(value) != testValue {
     t.Errorf("get error:%s\n", value)
   }
 }
