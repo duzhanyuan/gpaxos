@@ -301,7 +301,7 @@ func (self *LogStore) getFileId(needWriteSize uint32, fileId *int32, offset *uin
 //  value(data len) format:
 //    instance id(uint64)
 //    acceptor state data(data len - sizeof(uint64))
-func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer string, fileIdStr *string) error {
+func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer []byte, fileIdStr *string) error {
   begin := util.NowTimeMs()
 
   self.mutex.Lock()

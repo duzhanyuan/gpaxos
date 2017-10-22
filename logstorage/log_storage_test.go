@@ -14,7 +14,7 @@ func Test_basic(t *testing.T) {
   tmp, _ := ioutil.TempDir("/tmp", "gpaxos")
   db.Init(tmp)
 
-  err := db.Put(WriteOptions{}, testInstanceId, testValue)
+  err := db.Put(WriteOptions{}, testInstanceId, []byte(testValue))
   if err != nil {
     fmt.Printf("put error: %v", err)
     return

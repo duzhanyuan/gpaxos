@@ -230,7 +230,7 @@ func (self *LogStorage) Get(instanceId uint64 ) ([]byte, error) {
   return value, nil
 }
 
-func (self *LogStorage) valueToFileId(options WriteOptions, instanceId uint64, value string, fileId *string) error {
+func (self *LogStorage) valueToFileId(options WriteOptions, instanceId uint64, value []byte, fileId *string) error {
   err := self.valueStore.Append(options, instanceId, value, fileId)
   if err != nil {
     log.Error("append fail:%v", err)
@@ -264,7 +264,7 @@ func (self *LogStorage) PutToLevelDB(sync bool, instanceId uint64, value []byte)
   return nil
 }
 
-func (self *LogStorage) Put(options WriteOptions, instanceId uint64, value string) error {
+func (self *LogStorage) Put(options WriteOptions, instanceId uint64, value []byte) error {
   var err error
 
   if !self.hasInit {
