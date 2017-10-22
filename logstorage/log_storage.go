@@ -201,7 +201,7 @@ func (self *LogStorage) GetFromLevelDb(instanceId uint64, value *[]byte) error {
   return nil
 }
 
-func (self *LogStorage) Get(instanceId uint64, value []byte) error {
+func (self *LogStorage) Get(instanceId uint64, value *[]byte) error {
   var err error
 
   if !self.hasInit {
@@ -238,7 +238,7 @@ func (self *LogStorage) valueToFileId(options WriteOptions, instanceId uint64, v
   return err
 }
 
-func (self *LogStorage) FileIdToValue(fileId string, instanceId *uint64, value []byte) error {
+func (self *LogStorage) FileIdToValue(fileId string, instanceId *uint64, value *[]byte) error {
   err := self.valueStore.Read(fileId, instanceId, value)
   if err != nil {
     log.Error("fail, ret %v", err)
@@ -400,9 +400,9 @@ func (self *LogStorage) GetMinChosenInstanceID(minInstanceId *uint64) error {
   }
 
   var minKey uint64 = MINCHOSEN_KEY
-  var sValue string
+  var sValue []byte
   if self.valueStore.IsValidFileId(string(value)) {
-    err = self.Get(minKey, []byte(sValue))
+    err = self.Get(minKey, &sValue)
     if err != nil {
       log.Error("get from long store fail:%v", err)
       return err

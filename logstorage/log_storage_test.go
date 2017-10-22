@@ -21,12 +21,12 @@ func Test_basic(t *testing.T) {
   }
 
   var value []byte
-  err = db.Get(testInstanceId, value)
+  err = db.Get(testInstanceId, &value)
   if err != nil {
     fmt.Printf("get error: %v", err)
   }
 
   if string(value) != testValue {
-    t.Errorf("get error:%s\n", value)
+    t.Errorf("get error:%v\n", len(string(value)))
   }
 }

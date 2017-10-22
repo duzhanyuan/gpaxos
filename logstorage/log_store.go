@@ -296,6 +296,11 @@ func (self *LogStore) getFileId(needWriteSize uint32, fileId *int32, offset *uin
   return nil
 }
 
+// data file(data path/vpath/fileid.f) data format:
+//  data len(int32)
+//  value(data len) format:
+//    instance id(uint64)
+//    acceptor state data(data len - sizeof(uint64))
 func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer string, fileIdStr *string) error {
   begin := util.NowTimeMs()
 
@@ -316,7 +321,7 @@ func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer str
   tmpBuf := make([]byte, tmpBufLen)
   util.EncodeInt32(tmpBuf, 0, int32(len))
   util.EncodeUint64(tmpBuf, util.INT32SIZE, instanceId)
-  copy(tmpBuf[util.INT32SIZE+util.UINT64SIZE:], buffer)
+  copy(tmpBuf[util.INT32SIZE+util.UINT64SIZE:], []byte(buffer))
 
   ret, err := self.file.Write(tmpBuf)
   if ret != tmpBufLen {
@@ -334,14 +339,6 @@ func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer str
   ckSum := util.Crc32(0, tmpBuf[util.INT32SIZE:], common.CRC32_SKIP)
   self.EncodeFileId(fileId, uint64(offset), ckSum, fileIdStr)
 
-  {
-    var i int32
-    var o uint64
-    var c uint32
-    self.DecodeFileId(*fileIdStr, &i, &o, &c)
-    log.Info("c:%v", c)
-  }
-
   useMs := (util.NowTimeMs() - begin) / 1000000
 
   log.Info("ok, offset %d fileid %d cksum %d instanceid %d buffersize %d usetime %d ms sync %d",
@@ -349,7 +346,7 @@ func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer str
   return nil
 }
 
-func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer []byte) error {
+func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *[]byte) error {
   var fileId int32
   var offset uint64
   var cksum uint32
@@ -375,10 +372,8 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer []byte) 
     return fmt.Errorf("read len %d not equal to %d", n, util.INT32SIZE)
   }
 
-  bufferlen, err := strconv.Atoi(string(tmpbuf))
-  if err != nil {
-    return err
-  }
+  var bufferlen int32
+  util.DecodeInt32(tmpbuf, 0, &bufferlen)
 
   self.readMutex.Lock()
   defer self.readMutex.Unlock()
@@ -389,7 +384,7 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer []byte) 
     return err
   }
 
-  if n != bufferlen {
+  if n != int(bufferlen) {
     return fmt.Errorf("read len %d not equal to %d", n, bufferlen)
   }
 
@@ -400,10 +395,10 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer []byte) 
 
   util.DecodeUint64(tmpbuf, 0, instanceId)
 
-  buffer = util.CopyBytes([]byte(tmpbuf[util.UINT64SIZE:]))
+  *buffer = util.CopyBytes([]byte(tmpbuf[util.UINT64SIZE:]))
 
   log.Info("ok, fileid %d offset %d instanceid %d buffser size %d",
-    fileId, offset, *instanceId, bufferlen-util.UINT64SIZE)
+    fileId, offset, *instanceId, int(bufferlen)-util.UINT64SIZE)
 
   return nil
 }
