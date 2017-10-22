@@ -20,8 +20,7 @@ func Test_basic(t *testing.T) {
     return
   }
 
-  var value []byte
-  err = db.Get(testInstanceId, &value)
+  value, err := db.Get(testInstanceId)
   if err != nil {
     fmt.Printf("get error: %v", err)
   }

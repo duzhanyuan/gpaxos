@@ -201,33 +201,33 @@ func (self *LogStorage) GetFromLevelDb(instanceId uint64, value *[]byte) error {
   return nil
 }
 
-func (self *LogStorage) Get(instanceId uint64, value *[]byte) error {
+func (self *LogStorage) Get(instanceId uint64 ) ([]byte, error) {
   var err error
 
   if !self.hasInit {
     err = fmt.Errorf("not init yet")
-    return common.ErrDbNotInit
+    return nil, common.ErrDbNotInit
   }
 
   var fileId []byte
   err = self.GetFromLevelDb(instanceId, &fileId)
   if err != nil {
-    return err
+    return nil, err
   }
   log.Info("ret:%v", string(fileId))
 
   var fileInstanceId uint64
-  err = self.FileIdToValue(string(fileId), &fileInstanceId, value)
+  value, err := self.FileIdToValue(string(fileId), &fileInstanceId)
   if err != nil {
-    return err
+    return nil, err
   }
 
   if fileInstanceId != instanceId {
     log.Error("file instance id %d not equal to instance id %d", fileInstanceId, instanceId)
-    return common.ErrInvalidInstanceId
+    return nil, common.ErrInvalidInstanceId
   }
 
-  return nil
+  return value, nil
 }
 
 func (self *LogStorage) valueToFileId(options WriteOptions, instanceId uint64, value string, fileId *string) error {
@@ -238,14 +238,14 @@ func (self *LogStorage) valueToFileId(options WriteOptions, instanceId uint64, v
   return err
 }
 
-func (self *LogStorage) FileIdToValue(fileId string, instanceId *uint64, value *[]byte) error {
-  err := self.valueStore.Read(fileId, instanceId, value)
+func (self *LogStorage) FileIdToValue(fileId string, instanceId *uint64) ([]byte, error) {
+  value, err := self.valueStore.Read(fileId, instanceId)
   if err != nil {
     log.Error("fail, ret %v", err)
-    return err
+    return nil, err
   }
 
-  return nil
+  return value, nil
 }
 
 func (self *LogStorage) PutToLevelDB(sync bool, instanceId uint64, value []byte) error {
@@ -402,7 +402,7 @@ func (self *LogStorage) GetMinChosenInstanceID(minInstanceId *uint64) error {
   var minKey uint64 = MINCHOSEN_KEY
   var sValue []byte
   if self.valueStore.IsValidFileId(string(value)) {
-    err = self.Get(minKey, &sValue)
+    sValue, err = self.Get(minKey)
     if err != nil {
       log.Error("get from long store fail:%v", err)
       return err

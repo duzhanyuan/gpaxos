@@ -346,7 +346,7 @@ func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer str
   return nil
 }
 
-func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *[]byte) error {
+func (self *LogStore) Read(fileIdstr string, instanceId *uint64) ([]byte, error) {
   var fileId int32
   var offset uint64
   var cksum uint32
@@ -355,21 +355,21 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *[]byte)
   file, err := self.OpenFile(fileId)
   if err != nil {
     log.Error("openfile %s error %v", fileId, err)
-    return err
+    return nil, err
   }
 
   _, err = file.Seek(int64(offset), os.SEEK_SET)
   if err != nil {
-    return err
+    return nil, err
   }
 
   tmpbuf := make([]byte, util.INT32SIZE)
   n, err := file.Read(tmpbuf)
   if err != nil {
-    return err
+    return nil, err
   }
   if n != util.INT32SIZE {
-    return fmt.Errorf("read len %d not equal to %d", n, util.INT32SIZE)
+    return nil, fmt.Errorf("read len %d not equal to %d", n, util.INT32SIZE)
   }
 
   var bufferlen int32
@@ -381,26 +381,25 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64, buffer *[]byte)
   tmpbuf = make([]byte, bufferlen)
   n, err = file.Read(tmpbuf)
   if err != nil {
-    return err
+    return nil, err
   }
 
   if n != int(bufferlen) {
-    return fmt.Errorf("read len %d not equal to %d", n, bufferlen)
+    return nil, fmt.Errorf("read len %d not equal to %d", n, bufferlen)
   }
 
   fileCkSum := util.Crc32(0, tmpbuf, common.CRC32_SKIP)
   if fileCkSum != cksum {
-    return fmt.Errorf("cksum not equal, file cksum %d, cksum %d", fileCkSum, cksum)
+    return nil, fmt.Errorf("cksum not equal, file cksum %d, cksum %d", fileCkSum, cksum)
   }
 
   util.DecodeUint64(tmpbuf, 0, instanceId)
 
-  *buffer = util.CopyBytes([]byte(tmpbuf[util.UINT64SIZE:]))
 
   log.Info("ok, fileid %d offset %d instanceid %d buffser size %d",
     fileId, offset, *instanceId, int(bufferlen)-util.UINT64SIZE)
 
-  return nil
+  return tmpbuf[util.UINT64SIZE:], nil
 }
 
 func (self *LogStore) Del(fileIdStr string, instanceId uint64) error {
