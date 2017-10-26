@@ -1,15 +1,21 @@
 package log
 
-import "fmt"
+import (
+  //"github.com/golang/glog"
+  "github.com/cihub/seelog"
+)
 
-func Debug(format string, params ...interface{}) {
-    fmt.Printf(format + "\n", params)
+func init() {
 }
 
-func Info(format string, params ...interface{}) {
-    fmt.Printf(format + "\n", params)
+func Debugf(format string, params ... interface{}) {
+    seelog.Debugf(format, params...)
 }
 
-func Error(format string, params ...interface{}) {
-    fmt.Printf(format + "\n", params)
+func Infof(format string, params ...interface{}) {
+  seelog.Infof(format, params...)
+}
+
+func Errorf(format string, params ...interface{}) {
+  seelog.Errorf(format, params...)
 }
