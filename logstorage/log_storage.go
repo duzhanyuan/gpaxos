@@ -8,7 +8,7 @@ import (
   "strconv"
 
   "github.com/lichuang/gpaxos/common"
-  "github.com/lichuang/gpaxos/log"
+  log "github.com/lichuang/log4go"
   "github.com/lichuang/gpaxos/util"
   "math"
   "math/rand"
@@ -53,14 +53,14 @@ func (self *LogStorage) ClearAllLog() error {
   var sysVarbuffer []byte
   err := self.GetSystemVariables(&sysVarbuffer)
   if err != nil && err != common.ErrKeyNotFound {
-    log.Errorf("GetSystemVariables fail, ret %v", err)
+    log.Error("GetSystemVariables fail, ret %v", err)
     return err
   }
 
   var masVarbuffer []byte
   err = self.GetMasterVariables(&masVarbuffer)
   if err != nil && err != common.ErrKeyNotFound {
-    log.Errorf("GetMasterVariables fail, ret %v", err)
+    log.Error("GetMasterVariables fail, ret %v", err)
     return err
   }
 
@@ -71,7 +71,7 @@ func (self *LogStorage) ClearAllLog() error {
   bakPath := self.dbPath + ".bak"
   err = util.DeleteDir(bakPath)
   if err != nil {
-    log.Errorf("delete bak dir %s fail:%v", bakPath, err)
+    log.Error("delete bak dir %s fail:%v", bakPath, err)
     return err
   }
 
@@ -79,7 +79,7 @@ func (self *LogStorage) ClearAllLog() error {
 
   err = self.Init(self.dbPath)
   if err != nil {
-    log.Errorf("init again fail:%v", err)
+    log.Error("init again fail:%v", err)
     return err
   }
 
@@ -89,14 +89,14 @@ func (self *LogStorage) ClearAllLog() error {
   if len(sysVarbuffer) > 0 {
     err = self.SetSystemVariables(options, sysVarbuffer)
     if err != nil {
-      log.Errorf("SetSystemVariables fail:%v", err)
+      log.Error("SetSystemVariables fail:%v", err)
       return err
     }
   }
   if len(masVarbuffer) > 0 {
     err = self.SetMasterVariables(options, masVarbuffer)
     if err != nil {
-      log.Errorf("SetMasterVariables fail:%v", err)
+      log.Error("SetMasterVariables fail:%v", err)
       return err
     }
   }
@@ -120,19 +120,19 @@ func (self *LogStorage) Init(dbPath string) error {
 
   self.leveldb, err = leveldb.OpenFile(dbPath, &options)
   if err != nil {
-    log.Errorf("open leveldb fail, db path:%s", dbPath)
+    log.Error("open leveldb fail, db path:%s", dbPath)
     return err
   }
 
   self.valueStore = new(LogStore)
   err = self.valueStore.Init(dbPath, self)
   if err != nil {
-    log.Errorf("value store init fail:%v", err)
+    log.Error("value store init fail:%v", err)
     return err
   }
 
   self.hasInit = true
-  log.Infof("OK, db path:%s", dbPath)
+  log.Info("OK, db path:%s", dbPath)
 
   return nil
 }
@@ -157,7 +157,7 @@ func (self *LogStorage) GetMaxInstanceIDFileID(fileId *string, instanceId *uint6
       return common.ErrKeyNotFound
     }
 
-    log.Errorf("leveldb.get fail:%v", err)
+    log.Error("leveldb.get fail:%v", err)
     return common.ErrGetFail
   }
 
@@ -176,7 +176,7 @@ func (self *LogStorage) RebuildOneIndex(instanceId uint64, fileIdstr string) err
 
   err := self.leveldb.Put([]byte(key), []byte(fileIdstr), &opt)
   if err != nil {
-    log.Errorf("leveldb.Put fail, instanceid %d valuelen %d", instanceId, len(fileIdstr))
+    log.Error("leveldb.Put fail, instanceid %d valuelen %d", instanceId, len(fileIdstr))
     return err
   }
   return nil
@@ -188,15 +188,15 @@ func (self *LogStorage) GetFromLevelDb(instanceId uint64, value *[]byte) error {
   ret, err := self.leveldb.Get([]byte(key), nil)
   if err != nil {
     if err == leveldb.ErrNotFound {
-      log.Errorf("leveldb.get not found, instanceid %d", instanceId)
+      log.Error("leveldb.get not found, instanceid %d", instanceId)
       return common.ErrKeyNotFound
     }
 
-    log.Errorf("leveldb.get fail, instanceid %d", instanceId)
+    log.Error("leveldb.get fail, instanceid %d", instanceId)
     return common.ErrGetFail
   }
 
-  log.Infof("ret:%v", string(ret))
+  log.Info("ret:%v", string(ret))
   *value = ret
   return nil
 }
@@ -214,7 +214,7 @@ func (self *LogStorage) Get(instanceId uint64) ([]byte, error) {
   if err != nil {
     return nil, err
   }
-  log.Infof("ret:%v", string(fileId))
+  log.Info("ret:%v", string(fileId))
 
   var fileInstanceId uint64
   value, err := self.FileIdToValue(string(fileId), &fileInstanceId)
@@ -223,7 +223,7 @@ func (self *LogStorage) Get(instanceId uint64) ([]byte, error) {
   }
 
   if fileInstanceId != instanceId {
-    log.Errorf("file instance id %d not equal to instance id %d", fileInstanceId, instanceId)
+    log.Error("file instance id %d not equal to instance id %d", fileInstanceId, instanceId)
     return nil, common.ErrInvalidInstanceId
   }
 
@@ -233,7 +233,7 @@ func (self *LogStorage) Get(instanceId uint64) ([]byte, error) {
 func (self *LogStorage) valueToFileId(options WriteOptions, instanceId uint64, value []byte, fileId *string) error {
   err := self.valueStore.Append(options, instanceId, value, fileId)
   if err != nil {
-    log.Errorf("append fail:%v", err)
+    log.Error("append fail:%v", err)
   }
   return err
 }
@@ -241,7 +241,7 @@ func (self *LogStorage) valueToFileId(options WriteOptions, instanceId uint64, v
 func (self *LogStorage) FileIdToValue(fileId string, instanceId *uint64) ([]byte, error) {
   value, err := self.valueStore.Read(fileId, instanceId)
   if err != nil {
-    log.Errorf("fail, ret %v", err)
+    log.Error("fail, ret %v", err)
     return nil, err
   }
 
@@ -257,7 +257,7 @@ func (self *LogStorage) PutToLevelDB(sync bool, instanceId uint64, value []byte)
 
   err := self.leveldb.Put([]byte(key), value, &options)
   if err != nil {
-    log.Errorf("leveldb put fail, instanceid %d value len %d", instanceId, len(value))
+    log.Error("leveldb put fail, instanceid %d value len %d", instanceId, len(value))
     return err
   }
 
@@ -283,7 +283,7 @@ func (self *LogStorage) Put(options WriteOptions, instanceId uint64, value []byt
 
 func (self *LogStorage) ForceDel(options WriteOptions, instanceId uint64) error {
   if !self.hasInit {
-    log.Errorf("no init yet")
+    log.Error("no init yet")
     return common.ErrDbNotInit
   }
 
@@ -291,10 +291,10 @@ func (self *LogStorage) ForceDel(options WriteOptions, instanceId uint64) error 
   fileId, err := self.leveldb.Get([]byte(key), &opt.ReadOptions{})
   if err != nil {
     if err == leveldb.ErrNotFound {
-      log.Errorf("leveldb.get not found, instance:%d", instanceId)
+      log.Error("leveldb.get not found, instance:%d", instanceId)
       return nil
     }
-    log.Errorf("leveldb.get fail:%v", err)
+    log.Error("leveldb.get fail:%v", err)
     return common.ErrGetFail
   }
 
@@ -308,7 +308,7 @@ func (self *LogStorage) ForceDel(options WriteOptions, instanceId uint64) error 
   }
   err = self.leveldb.Delete([]byte(key), &writeOptions)
   if err != nil {
-    log.Errorf("leveldb.delete fail, instanceid %d, err:%v", instanceId, err)
+    log.Error("leveldb.delete fail, instanceid %d, err:%v", instanceId, err)
     return err
   }
   return nil
@@ -316,7 +316,7 @@ func (self *LogStorage) ForceDel(options WriteOptions, instanceId uint64) error 
 
 func (self *LogStorage) Del(options WriteOptions, instanceId uint64) error {
   if !self.hasInit {
-    log.Errorf("no init yet")
+    log.Error("no init yet")
     return common.ErrDbNotInit
   }
 
@@ -326,10 +326,10 @@ func (self *LogStorage) Del(options WriteOptions, instanceId uint64) error {
     fileId, err := self.leveldb.Get([]byte(key), &opt.ReadOptions{})
     if err != nil {
       if err == leveldb.ErrNotFound {
-        log.Errorf("leveldb.get not found, instance:%d", instanceId)
+        log.Error("leveldb.get not found, instance:%d", instanceId)
         return nil
       }
-      log.Errorf("leveldb.get fail:%v", err)
+      log.Error("leveldb.get fail:%v", err)
       return common.ErrGetFail
     }
 
@@ -344,7 +344,7 @@ func (self *LogStorage) Del(options WriteOptions, instanceId uint64) error {
   }
   err := self.leveldb.Delete([]byte(key), &writeOptions)
   if err != nil {
-    log.Errorf("leveldb.delete fail, instanceid %d, err:%v", instanceId, err)
+    log.Error("leveldb.delete fail, instanceid %d, err:%v", instanceId, err)
     return err
   }
   return nil
@@ -383,7 +383,7 @@ func (self *LogStorage) GetInstanceIDFromKey(key string) uint64 {
 
 func (self *LogStorage) GetMinChosenInstanceID(minInstanceId *uint64) error {
   if !self.hasInit {
-    log.Errorf("db not init yet")
+    log.Error("db not init yet")
     return common.ErrDbNotInit
   }
 
@@ -394,7 +394,7 @@ func (self *LogStorage) GetMinChosenInstanceID(minInstanceId *uint64) error {
   }
 
   if err == common.ErrKeyNotFound {
-    log.Errorf("no min chsoen instanceid")
+    log.Error("no min chsoen instanceid")
     *minInstanceId = 0
     return nil
   }
@@ -404,24 +404,24 @@ func (self *LogStorage) GetMinChosenInstanceID(minInstanceId *uint64) error {
   if self.valueStore.IsValidFileId(string(value)) {
     sValue, err = self.Get(minKey)
     if err != nil {
-      log.Errorf("get from long store fail:%v", err)
+      log.Error("get from long store fail:%v", err)
       return err
     }
   }
 
   if len(sValue) != util.UINT64SIZE {
-    log.Errorf("fail, mininstanceid size wrong")
+    log.Error("fail, mininstanceid size wrong")
     return common.ErrInvalidInstanceId
   }
 
   util.DecodeUint64([]byte(sValue), 0, minInstanceId)
-  log.Infof("ok, min chosen instanceid:%d", *minInstanceId)
+  log.Info("ok, min chosen instanceid:%d", *minInstanceId)
   return nil
 }
 
 func (self *LogStorage) SetMinChosenInstanceID(options WriteOptions, minInstanceId uint64) error {
   if !self.hasInit {
-    log.Errorf("no init yet")
+    log.Error("no init yet")
     return common.ErrDbNotInit
   }
 
@@ -434,7 +434,7 @@ func (self *LogStorage) SetMinChosenInstanceID(options WriteOptions, minInstance
     return err
   }
 
-  log.Infof("ok, min chosen instanceid %d", minInstanceId)
+  log.Info("ok, min chosen instanceid %d", minInstanceId)
   return nil
 }
 

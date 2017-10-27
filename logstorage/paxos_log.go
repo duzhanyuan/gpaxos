@@ -4,9 +4,9 @@ import (
   "fmt"
 
   "github.com/golang/protobuf/proto"
-
   "github.com/lichuang/gpaxos/common"
-  "github.com/lichuang/gpaxos/log"
+
+  log "github.com/lichuang/log4go"
 )
 
 type PaxosLog struct {
@@ -26,7 +26,7 @@ func (self *PaxosLog) WriteLog(options WriteOptions, instanceId uint64, value st
 
   err := self.WriteState(options, instanceId, state)
   if err != nil {
-    log.Errorf("WriteState to db fail, instanceid %d err:%v", instanceId, err)
+    log.Error("WriteState to db fail, instanceid %d err:%v", instanceId, err)
     return err
   }
 
@@ -37,7 +37,7 @@ func (self *PaxosLog) ReadLog(instanceId uint64, value *string) error {
   var state common.AcceptorStateData
   err := self.ReadState(instanceId, &state)
   if err != nil {
-    log.Errorf("readstate from db fail, instanceid %v, err %v",
+    log.Error("readstate from db fail, instanceid %v, err %v",
       instanceId, err)
     return err
   }
@@ -49,13 +49,13 @@ func (self *PaxosLog) ReadLog(instanceId uint64, value *string) error {
 func (self *PaxosLog) WriteState(options WriteOptions, instanceId uint64, state common.AcceptorStateData) error {
   buf, err := proto.Marshal(&state)
   if err != nil {
-    log.Errorf("State serialize error:%v", err)
+    log.Error("State serialize error:%v", err)
     return err
   }
 
   err = self.logStorage.Put(options, instanceId, buf)
   if err != nil {
-    log.Errorf("DB.Put fail, bufferlen %d error %v", len(buf), err)
+    log.Error("DB.Put fail, bufferlen %d error %v", len(buf), err)
     return err
   }
 
@@ -65,7 +65,7 @@ func (self *PaxosLog) WriteState(options WriteOptions, instanceId uint64, state 
 func (self *PaxosLog) ReadState(instanceId uint64, state *common.AcceptorStateData) error {
   buf, err := self.logStorage.Get(instanceId)
   if err != nil {
-    log.Errorf("DB.Get fail,error %v", err)
+    log.Error("DB.Get fail,error %v", err)
     return err
   }
   if len(buf) == 0 {
@@ -75,7 +75,7 @@ func (self *PaxosLog) ReadState(instanceId uint64, state *common.AcceptorStateDa
 
   err = proto.Unmarshal(buf, state)
   if err != nil {
-    log.Errorf("State Unseriasize fail: %v", err)
+    log.Error("State Unseriasize fail: %v", err)
     return err
   }
 
@@ -86,7 +86,7 @@ func (self *PaxosLog) ReadState(instanceId uint64, state *common.AcceptorStateDa
 func (self *PaxosLog) GetMaxInstanceIdFromLog(instanceId *uint64) error {
   err := self.logStorage.GetMaxInstanceID(instanceId)
   if err != nil {
-    log.Errorf("db.getmax fail, error:%v", err)
+    log.Error("db.getmax fail, error:%v", err)
     return err
   }
 

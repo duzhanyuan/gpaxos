@@ -1,21 +1,40 @@
 package log
 
 import (
-  //"github.com/golang/glog"
-  "github.com/cihub/seelog"
+  log "github.com/lichuang/log4go"
 )
 
-func init() {
+const (
+  DEBUG = iota
+  INFO
+  WARNING
+  ERROR
+  FATAL
+)
+
+func NewLogger(filePattern string, console bool, level int) {
+  w1 := log.NewFileWriter()
+  //w1.SetPathPattern("/tmp/logs/error%Y%M%D%H.log")
+  w1.SetPathPattern(filePattern)
+  log.Register(w1)
+
+  if console {
+    w2 := log.NewConsoleWriter()
+    log.Register(w2)
+  }
+  log.SetLevel(level)
 }
 
-func Debugf(format string, params ... interface{}) {
-    seelog.Debugf(format, params...)
+/*
+func Debug(format string, params ... interface{}) {
+    log.Debug(format, params...)
 }
 
-func Infof(format string, params ...interface{}) {
-  seelog.Infof(format, params...)
+func Info(format string, params ...interface{}) {
+  log.Info(format, params...)
 }
 
-func Errorf(format string, params ...interface{}) {
-  seelog.Errorf(format, params...)
+func Error(format string, params ...interface{}) {
+  log.Error(format, params...)
 }
+*/
