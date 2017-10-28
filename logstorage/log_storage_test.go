@@ -5,9 +5,10 @@ import (
   "testing"
 
   "github.com/lichuang/gpaxos/log"
+  "github.com/lichuang/gpaxos/common"
+
   "os"
   "fmt"
-  "github.com/lichuang/gpaxos/common"
   "math/rand"
 )
 
