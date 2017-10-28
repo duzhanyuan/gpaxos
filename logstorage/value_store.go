@@ -40,7 +40,7 @@ func (self *fileLogger) Log(format string, args ...interface{}) {
   self.file.Write([]byte(buf))
 }
 
-type LogStore struct {
+type ValueStore struct {
   path             string
   fileLogger       fileLogger
   metaFile         *os.File
@@ -53,7 +53,7 @@ type LogStore struct {
   deletedMaxFileId int32
 }
 
-func (self *LogStore) Init(path string, db *LogStorage) error {
+func (self *ValueStore) Init(path string, db *LogStorage) error {
   self.deletedMaxFileId = -1
   self.path = path + "/vfile"
   self.file = nil
@@ -108,7 +108,7 @@ func (self *LogStore) Init(path string, db *LogStorage) error {
     }
   }
 
-  err = self.RebuildIndex(db, &self.nowFileOffset)
+  err = self.rebuildIndex(db, &self.nowFileOffset)
   if err != nil {
     return err
   }
@@ -138,7 +138,12 @@ func (self *LogStore) Init(path string, db *LogStorage) error {
   return nil
 }
 
-func (self *LogStore) expendFile(file *os.File, fileSize *uint64) error {
+func (self *ValueStore) Close() {
+  self.metaFile.Close()
+  self.file.Close()
+}
+
+func (self *ValueStore) expendFile(file *os.File, fileSize *uint64) error {
   var err error
   var size int64
   size, err = file.Seek(0, os.SEEK_END)
@@ -165,7 +170,7 @@ func (self *LogStore) expendFile(file *os.File, fileSize *uint64) error {
   return nil
 }
 
-func (self *LogStore) IncreaseFileId() error {
+func (self *ValueStore) IncreaseFileId() error {
   fileId := self.fileId + 1
   buffer := make([]byte, util.INT32SIZE)
   util.EncodeInt32(buffer, 0, fileId)
@@ -200,12 +205,12 @@ func (self *LogStore) IncreaseFileId() error {
   return nil
 }
 
-func (self *LogStore) OpenFile(fileId int32) (*os.File, error) {
+func (self *ValueStore) OpenFile(fileId int32) (*os.File, error) {
   filePath := fmt.Sprintf("%s/%d.f", self.path, fileId)
   return os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 }
 
-func (self *LogStore) DeleteFile(fileId int32) error {
+func (self *ValueStore) DeleteFile(fileId int32) error {
   if self.deletedMaxFileId == -1 {
     if fileId-2000 > 0 {
       self.deletedMaxFileId = fileId - 2000
@@ -242,7 +247,7 @@ func (self *LogStore) DeleteFile(fileId int32) error {
   return err
 }
 
-func (self *LogStore) getFileId(needWriteSize uint32, fileId *int32, offset *uint32) error {
+func (self *ValueStore) getFileId(needWriteSize uint32, fileId *int32, offset *uint32) error {
   var err error
   if self.file == nil {
     err = fmt.Errorf("file already broken, file id %d", self.fileId)
@@ -302,7 +307,7 @@ func (self *LogStore) getFileId(needWriteSize uint32, fileId *int32, offset *uin
 //  value(data len) format:
 //    instance id(uint64)
 //    acceptor state data(data len - sizeof(uint64))
-func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer []byte, fileIdStr *string) error {
+func (self *ValueStore) Append(options WriteOptions, instanceId uint64, buffer []byte, fileIdStr *string) error {
   begin := util.NowTimeMs()
 
   self.mutex.Lock()
@@ -347,7 +352,7 @@ func (self *LogStore) Append(options WriteOptions, instanceId uint64, buffer []b
   return nil
 }
 
-func (self *LogStore) Read(fileIdstr string, instanceId *uint64) ([]byte, error) {
+func (self *ValueStore) Read(fileIdstr string, instanceId *uint64) ([]byte, error) {
   var fileId int32
   var offset uint64
   var cksum uint32
@@ -403,7 +408,7 @@ func (self *LogStore) Read(fileIdstr string, instanceId *uint64) ([]byte, error)
   return tmpbuf[util.UINT64SIZE:], nil
 }
 
-func (self *LogStore) Del(fileIdStr string, instanceId uint64) error {
+func (self *ValueStore) Del(fileIdStr string, instanceId uint64) error {
   var fileId int32 = -1
   var offset uint64
   var cksum uint32
@@ -420,7 +425,7 @@ func (self *LogStore) Del(fileIdStr string, instanceId uint64) error {
   return nil
 }
 
-func (self *LogStore) ForceDel(fileIdStr string, instanceId uint64) error {
+func (self *ValueStore) ForceDel(fileIdStr string, instanceId uint64) error {
   var fileId int32
   var offset uint64
   var cksum uint32
@@ -443,7 +448,7 @@ func (self *LogStore) ForceDel(fileIdStr string, instanceId uint64) error {
   return nil
 }
 
-func (self *LogStore) EncodeFileId(fileId int32, offset uint64, cksum uint32, fileIdStr *string) {
+func (self *ValueStore) EncodeFileId(fileId int32, offset uint64, cksum uint32, fileIdStr *string) {
   buffer := make([]byte, util.INT32SIZE+util.UINT64SIZE+util.UINT32SIZE)
   util.EncodeInt32(buffer, 0, fileId)
   util.EncodeUint64(buffer, util.INT32SIZE, offset)
@@ -452,7 +457,7 @@ func (self *LogStore) EncodeFileId(fileId int32, offset uint64, cksum uint32, fi
   *fileIdStr = string(buffer)
 }
 
-func (self *LogStore) DecodeFileId(fileIdStr string, fileId *int32, offset *uint64, cksum *uint32) {
+func (self *ValueStore) DecodeFileId(fileIdStr string, fileId *int32, offset *uint64, cksum *uint32) {
   buffer := bytes.NewBufferString(fileIdStr).Bytes()
 
   util.DecodeInt32(buffer, 0, fileId)
@@ -460,16 +465,13 @@ func (self *LogStore) DecodeFileId(fileIdStr string, fileId *int32, offset *uint
   util.DecodeUint32(buffer, util.INT32SIZE+util.UINT64SIZE, cksum)
 }
 
-func (self *LogStore) IsValidFileId(fileIdStr string) bool {
-  return len(fileIdStr) == (util.INT32SIZE + util.INT32SIZE + util.UINT32SIZE)
+func (self *ValueStore) isValidFileId(fileIdStr string) bool {
+  return len(fileIdStr) == (util.INT32SIZE + util.UINT64SIZE + util.UINT32SIZE)
 }
 
-func (self *LogStore) RebuildIndex(db *LogStorage, nowOffset *uint64) error {
-  var lastFileId string
-  var nowInstanceId uint64
-
+func (self *ValueStore) rebuildIndex(db *LogStorage, nowOffset *uint64) error {
   // 1. get max instance id and file id from leveldb
-  err := db.GetMaxInstanceIDFileID(&lastFileId, &nowInstanceId)
+  lastFileId, nowInstanceId, err := db.GetMaxInstanceIDFileID()
   if err != nil {
     return err
   }
@@ -509,7 +511,7 @@ func (self *LogStore) RebuildIndex(db *LogStorage, nowOffset *uint64) error {
   return err
 }
 
-func (self *LogStore) RebuildIndexForOneFile(fileId int32, offset uint64, db *LogStorage, nowWriteOffset *uint64, nowInstanceId *uint64) error {
+func (self *ValueStore) RebuildIndexForOneFile(fileId int32, offset uint64, db *LogStorage, nowWriteOffset *uint64, nowInstanceId *uint64) error {
   var err error = nil
 
   var file *os.File = nil
@@ -610,7 +612,7 @@ func (self *LogStore) RebuildIndexForOneFile(fileId int32, offset uint64, db *Lo
     var fileIdstr string
     self.EncodeFileId(fileId, nowOffset, fileCkSum, &fileIdstr)
 
-    err = db.RebuildOneIndex(instanceId, fileIdstr)
+    err = db.rebuildOneIndex(instanceId, fileIdstr)
     if err != nil {
       break
     }

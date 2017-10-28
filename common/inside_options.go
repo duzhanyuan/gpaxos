@@ -1,9 +1,14 @@
 package common
 
 type InsideOptions struct {
+  logFileMaxSize int64
 }
 
-var gInsideOptions *InsideOptions
+var gInsideOptions InsideOptions
+
+func init() {
+  gInsideOptions.logFileMaxSize = 1024 * 1024 * 100
+}
 
 func (self *InsideOptions) GetLogFileMaxSize() int64 {
   return 10240
@@ -34,7 +39,11 @@ func GetMaxRetryQueueLen() int {
 }
 
 func GetLogFileMaxSize() int64 {
-  return 10240
+  return gInsideOptions.logFileMaxSize
+}
+
+func SetLogFileMaxSize(size int64) {
+  gInsideOptions.logFileMaxSize = size
 }
 
 func GetStartPrepareTimeoutMs() uint32 {

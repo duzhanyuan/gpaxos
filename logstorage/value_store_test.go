@@ -10,7 +10,7 @@ func Test_encode_decode(t *testing.T) {
   var cksum uint32 = 111233456
 
   var encode string
-  log := new(LogStore)
+  log := new(ValueStore)
 
   log.EncodeFileId(fileid, offset, cksum, &encode)
 

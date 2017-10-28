@@ -2,6 +2,7 @@ package common
 
 import (
   "github.com/syndtr/goleveldb/leveldb/errors"
+  "math"
 )
 
 const (
@@ -78,5 +79,5 @@ const (
   CheckpointSendFileAckFlag_Fail = 2
 )
 
-//var INVALID_INSTANCEID uint64 = uint64(-1)
-//var NULL_NODEID uint64 = uint64(-1)
+var INVALID_INSTANCEID uint64 = math.MaxUint64
+var NULL_NODEID uint64 = math.MaxUint64 - 1
