@@ -72,12 +72,17 @@ func (self *TimerThread) main(start chan bool) {
     self.now = NowTimeMs()
 
     nextTimeout := self.getNextTimeout()
+    var notifyTimeout int32 = 1
 
     if nextTimeout > 0 {
-      self.dealWithTimeout(nextTimeout)
+     if nextTimeout <= self.now {
+       self.dealWithTimeout(nextTimeout)
+     } else {
+       notifyTimeout = int32(self.now - nextTimeout)
+     }
     }
 
-    if (self.waitAddTimerNotify(10)) {
+    if (self.waitAddTimerNotify(notifyTimeout)) {
       self.doAddNewTimer()
     }
   }
@@ -105,16 +110,6 @@ func (self *TimerThread) waitAddTimerNotify(ms int32) bool {
   return ret
 }
 
-func (self *TimerThread) doAddTimer(timer *Timer) {
-  // is it already timeout?
-  if timer.AbsTime <= self.now {
-    timer.Obj.OnTimeout(timer)
-    return
-  }
-
-  self.timerHeap.Push(timer)
-}
-
 func (self *TimerThread) dealWithTimeout(absTime uint64) {
   for {
     if self.timerHeap.Empty() {
@@ -138,6 +133,7 @@ func (self *TimerThread) dealWithTimeout(absTime uint64) {
 }
 
 func (self *TimerThread) doAddNewTimer() {
+  // simple exchange the timer list pointer
   self.mutex.Lock()
   tmp := self.currentTimerList
   self.currentTimerList = self.newTimerList
@@ -178,10 +174,11 @@ func (self *TimerThread) getNextTimeout() uint64 {
 }
 
 func (self *TimerThread) AddTimer(absTime uint64, timeType int, obj TimerObj) uint32 {
+  self.mutex.Lock()
   timer := newTimer(self.nowTimerId, absTime, timeType, obj)
+  timerId := self.nowTimerId
   self.nowTimerId += 1
 
-  self.mutex.Lock()
   self.newTimerList.PushBack(timer)
   // notify channel only once
   if len(self.newTimerChan) == 0 {
@@ -189,7 +186,7 @@ func (self *TimerThread) AddTimer(absTime uint64, timeType int, obj TimerObj) ui
   }
   self.mutex.Unlock()
 
-  return self.nowTimerId - 1
+  return timerId
 }
 
 func newTimer(timerId uint32, absTime uint64, timeType int, obj TimerObj) *Timer {
