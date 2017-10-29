@@ -1,7 +1,5 @@
 package util
 
-// from: https://stackoverflow.com/questions/29923666/waiting-on-a-sync-cond-with-a-timeout
-
 import (
   "sync"
   "time"
@@ -44,8 +42,11 @@ func (t *TimeoutCond) WaitFor(ms int) bool {
   case <-t.channel:
     r = true
   }
+
+  // stop the timer
   if !timer.Stop() {
     select {
+    // otherwise should wait timer
     case <- timer.C:
     default:
     }
