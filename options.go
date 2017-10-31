@@ -3,7 +3,7 @@ package gpaxos
 type Node struct {
   Ip string
   Port int
-  NodeId uint64
+  Id uint64
 }
 
 type Options struct {

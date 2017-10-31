@@ -3,10 +3,8 @@ package common;
 
 message Header
 {
-  required uint64 gid = 1;
-  required uint64 rid = 2;
-  required int32 cmdid = 3;
-  optional int32 version = 4;
+  required int32 cmdid = 1;
+  optional int32 version = 2;
 };
 
 message PaxosMsg

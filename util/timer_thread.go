@@ -14,6 +14,12 @@ type TimerThread struct {
   // save timers in heap, compare by abstime && timer id
   timerHeap *binaryheap.Heap
 
+  // for check timer id existing
+  existTimerIdMap map[uint32]bool
+
+  // mutex protect timer exist map
+  mapMutex sync.Mutex
+
   // mutex protect timer lists
   mutex sync.Mutex
 
@@ -48,6 +54,7 @@ func NewTimerThread() *TimerThread {
   timerThread := &TimerThread{
     nowTimerId: 1,
     timerHeap:binaryheap.NewWith(byTimer),
+    existTimerIdMap:make(map[uint32]bool,0),
     newTimerList: list.New(),
     currentTimerList: list.New(),
     newTimerChan:make(chan bool,1),
@@ -110,6 +117,17 @@ func (self *TimerThread) waitAddTimerNotify(ms int32) bool {
   return ret
 }
 
+func (self *TimerThread) fireTimeout(timer *Timer) {
+  id := timer.Id
+  self.mapMutex.Lock()
+  _, ok := self.existTimerIdMap[id]
+  self.mapMutex.Unlock()
+
+  if ok {
+    timer.Obj.OnTimeout(timer)
+  }
+}
+
 func (self *TimerThread) dealWithTimeout(absTime uint64) {
   for {
     if self.timerHeap.Empty() {
@@ -128,7 +146,7 @@ func (self *TimerThread) dealWithTimeout(absTime uint64) {
 
     self.timerHeap.Pop()
 
-    timer.Obj.OnTimeout(timer)
+    self.fireTimeout(timer)
   }
 }
 
@@ -150,7 +168,7 @@ func (self *TimerThread) doAddNewTimer() {
     // is it already timeout?
     if timer.AbsTime <= self.now {
       // fire timeout event directly
-      timer.Obj.OnTimeout(timer)
+      self.fireTimeout(timer)
     } else {
       // push to timer heap
       self.timerHeap.Push(timer)
@@ -184,9 +202,21 @@ func (self *TimerThread) AddTimer(absTime uint64, timeType int, obj TimerObj) ui
   if len(self.newTimerChan) == 0 {
     self.newTimerChan <- true
   }
+
+  // add into exist timer map
+  self.mapMutex.Lock()
+  self.existTimerIdMap[timerId] = true
+  self.mapMutex.Unlock()
+
   self.mutex.Unlock()
 
   return timerId
+}
+
+func (self *TimerThread) DelTimer(timerId uint32) {
+  self.mapMutex.Lock()
+  delete(self.existTimerIdMap, timerId)
+  self.mapMutex.Unlock()
 }
 
 func newTimer(timerId uint32, absTime uint64, timeType int, obj TimerObj) *Timer {

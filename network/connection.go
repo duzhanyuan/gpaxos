@@ -2,8 +2,9 @@ package network
 
 import (
   "net"
-  "github.com/lichuang/gpaxos/log"
   "time"
+
+  log "github.com/lichuang/log4go"
 )
 
 type Connection struct {
@@ -19,13 +20,13 @@ func NewConnection(addr string) *Connection {
   }
 }
 
-func (self *Connection) Send(msg string) bool {
+func (self *Connection) Send(msg []byte) bool {
   if self.conn == nil && !self.tryConnect() {
     log.Error("connect to %s fail", self.addr)
     return false
   }
 
-  n, err := self.conn.Write([]byte(msg))
+  n, err := self.conn.Write(msg)
   return n == len(msg) && err == nil
 }
 

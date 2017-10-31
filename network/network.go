@@ -4,7 +4,9 @@ import (
   "github.com/lichuang/gpaxos"
   "net"
   "strconv"
-  "github.com/lichuang/gpaxos/log"
+
+  log "github.com/lichuang/log4go"
+  "github.com/lichuang/gpaxos/common"
 )
 
 type ConnectionHandler func(conn net.Conn)
@@ -13,11 +15,11 @@ type Network struct {
   options *gpaxos.Options
 
   listener *Listener
-  connections map[string]*Connection
+  connections map[uint64]*Connection
 }
 
 func NewNetwork(options *gpaxos.Options, handler ConnectionHandler) *Network {
-  connections := make(map[string]*Connection)
+  connections := make(map[uint64]*Connection)
 
   var listener *Listener
 
@@ -29,7 +31,7 @@ func NewNetwork(options *gpaxos.Options, handler ConnectionHandler) *Network {
       continue
     }
 
-    connections[addr] = NewConnection(addr)
+    connections[node.Id] = NewConnection(addr)
   }
 
   return &Network{
@@ -39,18 +41,21 @@ func NewNetwork(options *gpaxos.Options, handler ConnectionHandler) *Network {
   }
 }
 
-func (self *Network) Send(msg, addr string) {
-  conn, exist := self.connections[addr]
+func (self *Network) Send(nodeid uint64, msg []byte) error {
+  conn, exist := self.connections[nodeid]
   if !exist {
-    log.Error("%s not exist", addr)
-    return
+    log.Error("%d not exist", nodeid)
+    return common.ErrNodeNotFound
   }
 
   conn.Send(msg)
+  return nil
 }
 
-func (self *Network) Broadcast(msg string) {
+func (self *Network) Broadcast(msg []byte) error {
   for _, conn := range self.connections {
     conn.Send(msg)
   }
+
+  return nil
 }
