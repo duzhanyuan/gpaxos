@@ -35,8 +35,8 @@ func init() {
   CHECKSUM_LEN = int32(binary.Size(uint32(0)))
 }
 
-func newBase(instance *Instance) *Base {
-  return &Base{
+func newBase(instance *Instance) Base {
+  return Base{
     config:instance.config,
     transport:instance.transport,
     instance:instance,
@@ -143,7 +143,7 @@ func (self *Base) broadcastMessage(msg *common.PaxosMsg, runType int) error {
   }
 
   if runType == BroadcastMessage_Type_RunSelf_First {
-    err := self.instance.onReceivePaxosMsg(msg, false)
+    err := self.instance.OnReceivePaxosMsg(msg, false)
     if err != nil {
       return err
     }
@@ -157,7 +157,7 @@ func (self *Base) broadcastMessage(msg *common.PaxosMsg, runType int) error {
   err = self.transport.BroadcastMessage(buffer)
 
   if runType == BroadcastMessage_Type_RunSelf_Final {
-    self.instance.onReceivePaxosMsg(msg, false)
+    self.instance.OnReceivePaxosMsg(msg, false)
   }
 
   return err

@@ -11,6 +11,7 @@ import (
 const (
   PAUSE = iota
   PREPARE
+  ACCEPT
 )
 
 // save the proposer state data
@@ -76,7 +77,7 @@ func (self *ProposerState) newPrepare() {
   log.Info("end proposalid %d", self.proposalId)
 }
 
-func (self *ProposerState) addPreAcceptValue(otherPreAcceptBallot BallotNumber, otherPreAcceptValue []byte) {
+func (self *ProposerState) AddPreAcceptValue(otherPreAcceptBallot BallotNumber, otherPreAcceptValue []byte) {
   if otherPreAcceptBallot.IsNull() {
     return
   }
@@ -88,24 +89,24 @@ func (self *ProposerState) addPreAcceptValue(otherPreAcceptBallot BallotNumber, 
   }
 }
 
-func (self *ProposerState) getProposalId() uint64 {
+func (self *ProposerState) GetProposalId() uint64 {
   return self.proposalId
 }
 
-func (self *ProposerState) getValue() []byte {
+func (self *ProposerState) GetValue() []byte {
   return self.value
 }
 
-func (self *ProposerState) setValue(value []byte) {
+func (self *ProposerState) SetValue(value []byte) {
   self.value = util.CopyBytes(value)
 }
 
-func (self *ProposerState) setOtherProposalId(otherProposalId uint64) {
+func (self *ProposerState) SetOtherProposalId(otherProposalId uint64) {
   if otherProposalId > self.highestOtherProposalId {
     self.highestOtherProposalId = otherProposalId
   }
 }
 
-func (self *ProposerState) resetHighestOtherPreAcceptBallot() {
+func (self *ProposerState) ResetHighestOtherPreAcceptBallot() {
   self.highestOtherPreAcceptBallot.Reset()
 }

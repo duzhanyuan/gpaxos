@@ -121,6 +121,29 @@ func (self *Instance) receiveMsgForLearner(msg *common.PaxosMsg) error {
   return nil
 }
 
+func (self *Instance) receiveMsgForProposer(msg *common.PaxosMsg) error {
+  if self.config.IsIMFollower() {
+    log.Error("follower skip %d msg", msg.GetMsgType())
+    return nil
+  }
+
+  msgInstanceId := msg.GetInstanceID()
+  proposerInstanceId := self.proposer.getInstanceId()
+
+  if msgInstanceId != proposerInstanceId {
+    return nil
+  }
+
+  msgType := msg.GetMsgType()
+  if msgType == common.MsgType_PaxosPrepareReply {
+    return self.proposer.OnPrepareReply(msg)
+  } else if msgType == common.MsgType_PaxosAcceptReply {
+    return self.proposer.OnAcceptReply(msg)
+  }
+
+  return common.ErrInvalidMsg
+}
+
 // handle msg type which for acceptor
 func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) error {
   if self.config.IsIMFollower() {
@@ -129,8 +152,10 @@ func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) 
   }
 
   msgInstanceId := msg.GetInstanceID()
-  acceptorInstanceId := self.acceptor.getInstanceId()
+  acceptorInstanceId := self.acceptor.GetInstanceId()
 
+  // msgInstanceId == acceptorInstanceId + 1  means this instance has been approved
+  // so just learn it
   if msgInstanceId == acceptorInstanceId + 1 {
     newMsg := &common.PaxosMsg{ }
     util.CopyStruct(newMsg, *msg)
@@ -142,7 +167,7 @@ func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) 
   msgType := msg.GetMsgType()
 
   // msg instance == acceptorInstanceId means this msg is what acceptor processing
-  // so call the acceptor func to handle it
+  // so call the acceptor function to handle it
   if msgInstanceId == acceptorInstanceId {
     if msgType == common.MsgType_PaxosPrepare {
       return self.acceptor.onPrepare(msg)
@@ -161,7 +186,7 @@ func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) 
     return nil
   }
 
-  // ignore handled msg
+  // ignore processed msg
   if msgInstanceId <= acceptorInstanceId {
     return nil
   }
@@ -172,7 +197,7 @@ func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) 
   return nil
 }
 
-func (self *Instance) onReceivePaxosMsg(msg *common.PaxosMsg, isRetry bool) error {
+func (self *Instance) OnReceivePaxosMsg(msg *common.PaxosMsg, isRetry bool) error {
   proposer := self.proposer
   learner := self.learner
   msgType := msg.GetMsgType()
@@ -181,10 +206,6 @@ func (self *Instance) onReceivePaxosMsg(msg *common.PaxosMsg, isRetry bool) erro
     proposer.getInstanceId(), msg.GetInstanceID(), msgType, msg.GetNodeID(),
     self.config.GetMyNodeId(),learner.getSeenLatestInstanceId())
 
-  if !self.isCheckSumValid(msg) {
-    return common.ErrInvalidMsg
-  }
-
   // handle paxos prepare and accept msg
   if msgType == common.MsgType_PaxosPrepare || msgType == common.MsgType_PaxosAccept {
     if !self.config.IsValidNodeID(msg.GetNodeID()) {
@@ -192,7 +213,16 @@ func (self *Instance) onReceivePaxosMsg(msg *common.PaxosMsg, isRetry bool) erro
       return nil
     }
 
+    if !self.isCheckSumValid(msg) {
+      return common.ErrInvalidMsg
+    }
+
     return self.receiveMsgForAcceptor(msg, isRetry)
+  }
+
+  // handle paxos prepare and accept reply msg
+  if (msgType == common.MsgType_PaxosPrepareReply || msgType == common.MsgType_PaxosAcceptReply) {
+    return self.receiveMsgForProposer(msg)
   }
 
   return nil

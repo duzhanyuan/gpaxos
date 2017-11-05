@@ -17,3 +17,7 @@ func (self *Learner) isImLatest() bool {
 func (self *Learner) getSeenLatestInstanceId() uint64 {
   return 0
 }
+
+func (self *Learner) ProposerSendSuccess(instanceId uint64, proposalId uint64) {
+
+}

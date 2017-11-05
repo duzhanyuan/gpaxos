@@ -38,10 +38,10 @@ const (
 
 // PaxosMsgType
 const (
-  MsgType_PaxosPrepare                     = 1
-  MsgType_PaxosPrepareReply                = 2
-  MsgType_PaxosAccept                      = 3
-  MsgType_PaxosAcceptReply                 = 4
+  MsgType_PaxosPrepare                     = 1  // for acceptor
+  MsgType_PaxosPrepareReply                = 2  // for proposer
+  MsgType_PaxosAccept                      = 3  // for acceptor
+  MsgType_PaxosAcceptReply                 = 4  //
   MsgType_PaxosLearner_AskforLearn         = 5
   MsgType_PaxosLearner_SendLearnValue      = 6
   MsgType_PaxosLearner_ProposerSendSuccess = 7
