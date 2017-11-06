@@ -13,8 +13,8 @@ import (
 type Acceptor struct {
   Base
 
-  config        *config.Config
-  state *AcceptorState
+  config  *config.Config
+  state   *AcceptorState
 }
 
 func NewAcceptor(instance *Instance) *Acceptor{
@@ -44,7 +44,7 @@ func (self *Acceptor) Init() error {
 }
 
 func (self *Acceptor) GetInstanceId() uint64 {
-  return self.Base.getInstanceId()
+  return self.Base.GetInstanceId()
 }
 
 func (self *Acceptor) SetInstanceId(instanceId uint64) {
@@ -69,50 +69,90 @@ func (self *Acceptor) onPrepare(msg *common.PaxosMsg) error {
   log.Info("start prepare msg instanceid %d, from %d, proposalid %d",
     msg.GetInstanceID(), msg.GetNodeID(), msg.GetProposalID())
 
-  reply := common.PaxosMsg{
+  reply := &common.PaxosMsg{
     InstanceID: proto.Uint64(self.GetInstanceId()),
     NodeID:     proto.Uint64(self.config.GetMyNodeId()),
     ProposalID: proto.Uint64(msg.GetProposalID()),
     MsgType:    proto.Int32(common.MsgType_PaxosPrepareReply),
   }
 
-  ballot := newBallotNumber(msg.GetProposalID(), msg.GetNodeID())
+  ballot := NewBallotNumber(msg.GetProposalID(), msg.GetNodeID())
+  state := self.state
 
-  if ballot.BE(self.acceptorState.GetPromiseNum()) {
+  if ballot.BE(state.GetPromiseNum()) {
     log.Debug("[promise]promiseid %d, promisenodeid %d, preacceptedid %d, preacceptednodeid %d",
-      self.acceptorState.GetPromiseNum().proposalId, self.acceptorState.GetPromiseNum().nodeId,
-      self.acceptorState.GetAcceptedNum().proposalId, self.acceptorState.GetAcceptedNum().nodeId)
+      state.GetPromiseNum().proposalId, state.GetPromiseNum().nodeId,
+      state.GetAcceptedNum().proposalId, state.GetAcceptedNum().nodeId)
 
-    reply.PreAcceptID = proto.Uint64(self.acceptorState.GetAcceptedNum().proposalId)
-    reply.PreAcceptNodeID = proto.Uint64(self.acceptorState.GetAcceptedNum().nodeId)
+    reply.PreAcceptID = proto.Uint64(state.GetAcceptedNum().proposalId)
+    reply.PreAcceptNodeID = proto.Uint64(state.GetAcceptedNum().nodeId)
 
-    if self.acceptorState.GetAcceptedNum().proposalId > 0 {
-      reply.Value = util.CopyBytes(self.acceptorState.acceptValues)
+    if state.GetAcceptedNum().proposalId > 0 {
+      reply.Value = util.CopyBytes(state.GetAcceptedValue())
     }
 
-    self.acceptorState.SetPromiseNum(ballot)
+    state.SetPromiseNum(ballot)
 
-    err := self.acceptorState.Persist(self.GetInstanceId(), self.GetLastChecksum())
+    err := state.Persist(self.GetInstanceId(), self.Base.GetLastChecksum())
     if err != nil {
       log.Error("persist fail, now instanceid %d ret %v", self.GetInstanceId(), err)
       return err
     }
   } else {
     log.Debug("[reject]promiseid %d, promisenodeid %d",
-      self.acceptorState.GetPromiseNum().proposalId, self.acceptorState.GetPromiseNum().nodeId)
+      state.GetPromiseNum().proposalId, state.GetPromiseNum().nodeId)
 
-    reply.RejectByPromiseID = proto.Uint64(self.acceptorState.GetPromiseNum().proposalId)
+    reply.RejectByPromiseID = proto.Uint64(state.GetPromiseNum().proposalId)
   }
 
   replyNodeId := msg.GetNodeID()
   log.Info("end prepare instanceid %d replynodeid %d", self.GetInstanceId(), replyNodeId)
 
-  self.SendPaxosMessage(replyNodeId, reply, common.Message_SendType_UDP)
+  self.Base.sendPaxosMessage(replyNodeId, reply)
 
   return nil
 }
 
 // handle paxos accept msg
 func (self *Acceptor) onAccept(msg *common.PaxosMsg) error {
+  log.Info("start accept msg instanceid %d, from %d, proposalid %d, valuelen %d",
+    msg.GetInstanceID(), msg.GetNodeID(), msg.GetProposalID(), len(msg.Value))
+
+  reply := &common.PaxosMsg{
+    InstanceID: proto.Uint64(self.GetInstanceId()),
+    NodeID:     proto.Uint64(self.config.GetMyNodeId()),
+    ProposalID: proto.Uint64(msg.GetProposalID()),
+    MsgType:    proto.Int32(common.MsgType_PaxosAcceptReply),
+  }
+
+  ballot := NewBallotNumber(msg.GetProposalID(), msg.GetNodeID())
+  state := self.state
+
+  if ballot.BE(state.GetPromiseNum()) {
+    log.Debug("[promise]promiseid %d, promisenodeid %d, preacceptedid %d, preacceptednodeid %d",
+      state.GetPromiseNum().proposalId, state.GetPromiseNum().nodeId,
+      state.GetAcceptedNum().proposalId, state.GetAcceptedNum().nodeId)
+
+    state.SetPromiseNum(ballot)
+    state.SetAcceptedNum(ballot)
+    state.SetAcceptedValue(msg.Value)
+
+    err := state.Persist(self.GetInstanceId(), self.Base.GetLastChecksum())
+    if err != nil {
+      log.Error("persist fail, now instanceid %d ret %v", self.GetInstanceId(), err)
+      return err
+    }
+  } else {
+    log.Debug("[reject]promiseid %d, promisenodeid %d",
+      state.GetPromiseNum().proposalId, state.GetPromiseNum().nodeId)
+
+    reply.RejectByPromiseID = proto.Uint64(state.GetPromiseNum().proposalId)
+  }
+
+  replyNodeId := msg.GetNodeID()
+  log.Info("end accept instanceid %d replynodeid %d", self.GetInstanceId(), replyNodeId)
+
+  self.Base.sendPaxosMessage(replyNodeId, reply)
+
   return nil
 }

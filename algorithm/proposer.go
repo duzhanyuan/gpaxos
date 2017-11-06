@@ -79,7 +79,7 @@ func (self *Proposer) prepare(needNewBallot bool) {
   state := self.state
 
   log.Info("start now.instanceid %d mynodeid %d state.proposal id %d state.valuelen %d",
-    base.getInstanceId(), self.config.GetMyNodeId(), state.GetProposalId(), len(state.GetValue()))
+    base.GetInstanceId(), self.config.GetMyNodeId(), state.GetProposalId(), len(state.GetValue()))
 
   // first reset all state
   self.exitAccept()
@@ -95,7 +95,7 @@ func (self *Proposer) prepare(needNewBallot bool) {
   // pack paxos prepare msg and broadcast
   msg := &common.PaxosMsg{
     MsgType:    proto.Int32(common.MsgType_PaxosPrepare),
-    InstanceID: proto.Uint64(base.getInstanceId()),
+    InstanceID: proto.Uint64(base.GetInstanceId()),
     NodeID:     proto.Uint64(self.config.GetMyNodeId()),
     ProposalID: proto.Uint64(state.GetProposalId()),
   }
@@ -141,7 +141,7 @@ func (self *Proposer) addAcceptTimer(timeOutMs uint32) {
 }
 
 func (self *Proposer) getInstanceId() uint64 {
-  return self.Base.getInstanceId()
+  return self.Base.GetInstanceId()
 }
 
 func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) error {
@@ -188,11 +188,11 @@ func (self *Proposer) accept() {
 
   msg := &common.PaxosMsg{
     MsgType:    proto.Int32(common.MsgType_PaxosAccept),
-    InstanceID: proto.Uint64(base.getInstanceId()),
+    InstanceID: proto.Uint64(base.GetInstanceId()),
     NodeID:     proto.Uint64(self.config.GetMyNodeId()),
     ProposalID: proto.Uint64(state.GetProposalId()),
     Value:state.GetValue(),
-    LastChecksum:proto.Uint32(base.getLastChecksum()),
+    LastChecksum:proto.Uint32(base.GetLastChecksum()),
   }
 
   self.msgCounter.StartNewRound()
@@ -227,7 +227,7 @@ func (self *Proposer) OnAcceptReply(msg *common.PaxosMsg) error {
 
   if msgCounter.IsPassedOnThisRound() {
     self.exitAccept()
-    self.learner.ProposerSendSuccess(base.getInstanceId(), state.GetProposalId())
+    self.learner.ProposerSendSuccess(base.GetInstanceId(), state.GetProposalId())
   } else {
     self.addAcceptTimer(30)
   }
@@ -236,5 +236,6 @@ func (self *Proposer) OnAcceptReply(msg *common.PaxosMsg) error {
 }
 
 func (self *Proposer)OnTimeout(timer *util.Timer) {
+  log.Debug("proposer timeout type:%d", timer.TimerType)
 
 }

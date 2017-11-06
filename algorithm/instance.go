@@ -87,7 +87,7 @@ func (self *Instance) onCommit() {
     return
   }
 
-  if !self.learner.isImLatest() {
+  if !self.learner.IsImLatest() {
     return
   }
 
@@ -104,7 +104,7 @@ func (self *Instance) onCommit() {
   }
 
   // ok, now do commit
-  self.commitctx.startCommit(self.base.getInstanceId())
+  self.commitctx.startCommit(self.base.GetInstanceId())
 
   self.proposer.newValue(self.commitctx.getCommitValue())
 }

@@ -45,7 +45,7 @@ func newBase(instance *Instance) Base {
   }
 }
 
-func (self *Base) getInstanceId() uint64 {
+func (self *Base) GetInstanceId() uint64 {
   return self.instanceId
 }
 
@@ -57,7 +57,7 @@ func (self *Base) newInstance() {
   self.instanceId++
 }
 
-func (self *Base) getLastChecksum() uint32 {
+func (self *Base) GetLastChecksum() uint32 {
   return self.instance.GetLastChecksum()
 }
 
