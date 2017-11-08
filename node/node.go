@@ -6,7 +6,7 @@ import (
 
 type Node struct{
   options *gpaxos.Options
-  instance *Instance
+  //instance *Instance
 }
 
 func checkOptions(options *gpaxos.Options) bool {
@@ -29,6 +29,6 @@ func (self *Node) Propose(value string) error {
   return nil
 }
 
-func (self *Node) Run () bool {
+func (self *Node) Run() bool {
   return true
 }

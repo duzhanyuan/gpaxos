@@ -164,6 +164,7 @@ func (self *Learner) sendNowInstanceID(instanceId uint64, sendNodeId uint64) {
   }
 
   if self.GetInstanceId()-instanceId > 50 {
+    /*
     systemVarBuffer, err := self.config.GetSystemVSM().GetCheckpointBuffer()
     if err == nil {
       msg.SystemVariables = util.CopyBytes(systemVarBuffer)
@@ -173,6 +174,7 @@ func (self *Learner) sendNowInstanceID(instanceId uint64, sendNodeId uint64) {
     if err == nil {
       msg.MasterVariables = util.CopyBytes(masterVarBuffer)
     }
+    */
   }
 
   self.sendPaxosMessage(sendNodeId, msg)

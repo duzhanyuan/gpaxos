@@ -10,11 +10,10 @@ import (
   "github.com/lichuang/gpaxos"
   "github.com/lichuang/gpaxos/util"
   "github.com/golang/protobuf/proto"
+  "net"
 )
 
 type Instance struct {
-  base *Base
-
   config *config.Config
   logStorage *logstorage.LogStorage
   committer *Committer
@@ -32,27 +31,37 @@ type Instance struct {
   commitChan chan CommitMsg
 }
 
-func NewInstance(config *config.Config, logstorage *logstorage.LogStorage) *Instance {
+func NewInstance(config *config.Config, options *gpaxos.Options, logstorage *logstorage.LogStorage) *Instance {
   instance := &Instance{
     config:config,
     logStorage:logstorage,
     timerThread:util.NewTimerThread(),
     end:make(chan bool),
-
     commitChan:make(chan CommitMsg),
   }
 
-  instance.base = newBase(instance)
   instance.commitctx = newCommitContext(instance)
   instance.committer = newCommitter(instance)
   instance.proposer = newProposer(instance)
   instance.learner = newLearner(instance)
+
+  instance.initNetwork(options)
 
   start := make(chan bool)
   go instance.main(start)
   <- start
 
   return instance
+}
+
+func (self *Instance)initNetwork(options *gpaxos.Options) *Instance {
+  self.transport = network.NewNetwork(options, NewPaxosSessionFactory())
+  return self
+}
+
+// for ConnectionHandler interface
+func (self *Instance) Handle(conn net.Conn) {
+
 }
 
 func (self *Instance) main(start chan bool) {
@@ -104,7 +113,7 @@ func (self *Instance) onCommit() {
   }
 
   // ok, now do commit
-  self.commitctx.startCommit(self.base.GetInstanceId())
+  self.commitctx.startCommit(self.proposer.GetInstanceId())
 
   self.proposer.newValue(self.commitctx.getCommitValue())
 }

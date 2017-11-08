@@ -6,14 +6,14 @@ import (
 
 type Listener struct {
   addr string
-  handler ConnectionHandler
+  factory SessionFactory
   listener net.Listener
 }
 
-func NewListener(addr string, handler ConnectionHandler) *Listener {
+func NewListener(addr string, factory SessionFactory) *Listener {
   return &Listener{
     addr:addr,
-    handler:handler,
+    factory:factory,
   }
 }
 
@@ -30,7 +30,8 @@ func (self *Listener) main() {
       continue
     }
 
-    go self.handler(conn)
+    session := self.factory.Create(conn)
+    go session.Handle()
   }
 }
 

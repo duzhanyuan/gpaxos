@@ -2,10 +2,7 @@ package algorithm
 
 import (
   "github.com/lichuang/gpaxos/config"
-  "github.com/lichuang/gpaxos/util"
   "github.com/lichuang/gpaxos"
-
-  log "github.com/lichuang/log4go"
 )
 
 type Committer struct {

@@ -1,7 +1,6 @@
 package algorithm
 
 import (
-  "github.com/lichuang/gpaxos/config"
   "github.com/lichuang/gpaxos/common"
   "github.com/lichuang/gpaxos"
   "bytes"

@@ -1,5 +1,11 @@
 package config
 
+/*
+import (
+  "github.com/lichuang/gpaxos"
+  "github.com/lichuang/gpaxos/logstorage"
+)
+
 import (
   "github.com/lichuang/gpaxos/common"
   "github.com/lichuang/gpaxos/logstorage"
@@ -236,3 +242,4 @@ func (self *SystemStateMachine) GetSystemVariables(variables *common.SystemVaria
 func (self *SystemStateMachine) GetMembershipMap() map[uint64]bool {
   return self.nodeIdMap
 }
+*/

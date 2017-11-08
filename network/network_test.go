@@ -3,33 +3,34 @@ package network
 import (
   "testing"
   "github.com/lichuang/gpaxos"
-  "github.com/lichuang/gpaxos/log"
   "fmt"
   "net"
-  "strconv"
   "bufio"
   "time"
 )
 
-func handleConnection1(conn net.Conn) {
-  remoteAddr := conn.RemoteAddr().String()
-  log.Debug("accept connection from %s", remoteAddr)
+type TestSessionFactory struct {
 
-  for {
-    line, err := bufio.NewReader(conn).ReadBytes('\n')
-    if err != nil {
-      break
-    }
-
-    log.Debug("msg1: %s", string(line))
-  }
-
-  log.Debug("connection from %s disconnected", remoteAddr)
 }
 
-func handleConnection2(conn net.Conn) {
+func (self *TestSessionFactory)Create(conn net.Conn) Session {
+  return NewTestSession(conn)
+}
+
+type TestSession struct {
+  conn net.Conn
+}
+
+func NewTestSession(conn net.Conn) *TestSession {
+  return &TestSession{
+    conn:conn,
+  }
+}
+
+func (self *TestSession)Handle() {
+  conn := self.conn
   remoteAddr := conn.RemoteAddr().String()
-  log.Debug("accept connection from %s", remoteAddr)
+  fmt.Printf("accept connection from %s", remoteAddr)
 
   for {
     line, err := bufio.NewReader(conn).ReadBytes('\n')
@@ -37,27 +38,17 @@ func handleConnection2(conn net.Conn) {
       break
     }
 
-    log.Debug("msg2: %s", string(line))
+    fmt.Printf("msg: %s", string(line))
   }
 
-  log.Debug("connection from %s disconnected", remoteAddr)
+  fmt.Printf("connection from %s disconnected", remoteAddr)
 }
 
 func Test_basic(t *testing.T) {
-  node1 := gpaxos.Node{
-    Ip:"127.0.0.1",
-    Port:11111,
-  }
-  addr1 := node1.Ip + ":" + strconv.Itoa(node1.Port)
-  fmt.Printf("%s\n", addr1)
+  node1 := gpaxos.NewNode("127.0.0.1", 11111)
+  node2 := gpaxos.NewNode("127.0.0.1", 22222)
 
-  node2 := gpaxos.Node{
-    Ip:"127.0.0.1",
-    Port:22222,
-  }
-  addr2 := node2.Ip + ":" + strconv.Itoa(node2.Port)
-
-  nodeList := make([]gpaxos.Node, 0)
+  nodeList := make([]*gpaxos.Node, 0)
   nodeList = append(nodeList, node1)
   nodeList = append(nodeList, node2)
 
@@ -70,11 +61,11 @@ func Test_basic(t *testing.T) {
       NodeList: nodeList,
   }
 
-  net1 := NewNetwork(options1, handleConnection1)
-  net2 := NewNetwork(options2, handleConnection2)
+  net1 := NewNetwork(options1, &TestSessionFactory{})
+  net2 := NewNetwork(options2, &TestSessionFactory{})
 
-  net1.Send("from net1\n", addr2)
-  net2.Send("from net2\n:", addr1)
+  net1.SendMessage(node2.Id,[]byte("from net1\n"))
+  net2.SendMessage(node1.Id,[]byte("from net2\n"))
 
   time.Sleep(1 * time.Second)
   fmt.Printf("OK")

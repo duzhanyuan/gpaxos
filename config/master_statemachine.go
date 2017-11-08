@@ -1,5 +1,6 @@
 package config
 
+/*
 import (
   "sync"
   "github.com/lichuang/gpaxos/logstorage"
@@ -35,7 +36,7 @@ func NewMasterStateMachine(groupIdx int32, myNodeId uint64,
     myGroupIdx: groupIdx,
     myNodeId:myNodeId,
     masterNodeId:common.NULL_NODEID,
-    masterVersion:-1,
+    masterVersion:0,
     leaseTime:0,
     absExpireTime:0,
     mvStore:master.NewMasterVariablesStore(storage),
@@ -242,3 +243,4 @@ func (self *MasterStateMachine) UpdateByCheckpoint(buffer []byte, change *bool) 
 
   return nil
 }
+*/

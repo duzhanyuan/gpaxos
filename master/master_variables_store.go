@@ -35,8 +35,7 @@ func (self *MasterVariablesStore) Write(options logstorage.WriteOptions, groupId
 }
 
 func (self *MasterVariablesStore) Read(groupIdx int32, variables *common.MasterVariables) error {
-  var buffer []byte
-  err := self.LogStorage.GetMasterVariables(&buffer)
+  buffer, err := self.LogStorage.GetMasterVariables()
   if err != nil && err != common.ErrKeyNotFound {
     log.Error("db.get fail %v, group idx %d", err, groupIdx)
     return err

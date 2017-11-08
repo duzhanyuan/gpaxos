@@ -8,8 +8,8 @@ import (
 type Config struct {
   isFollower         bool
   followToNodeId     uint64
-  systemStateMachine *SystemStateMachine
-  masterStateMachine *MasterStateMachine
+  //systemStateMachine *SystemStateMachine
+  //masterStateMachine *MasterStateMachine
   myFollowerMaps     map[uint64]uint64
 }
 
@@ -57,6 +57,7 @@ func (self *Config) AddTmpNodeOnlyForLearn(nodeId uint64) {
 
 }
 
+/*
 func (self *Config) GetSystemVSM() *SystemStateMachine {
   return self.systemStateMachine
 }
@@ -64,6 +65,7 @@ func (self *Config) GetSystemVSM() *SystemStateMachine {
 func (self *Config) GetMasterSM() *MasterStateMachine {
   return self.masterStateMachine
 }
+*/
 
 func (self *Config) CheckConfig() bool {
   return true
