@@ -25,6 +25,11 @@ func NewLogger(filePattern string, console bool, level int) {
   log.SetLevel(level)
 }
 
+func NewConsoleLogger() {
+  w2 := log.NewConsoleWriter()
+  log.Register(w2)
+  log.SetLevel(log.DEBUG)
+}
 /*
 func Debug(format string, params ... interface{}) {
     log.Debug(format, params...)

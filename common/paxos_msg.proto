@@ -4,7 +4,8 @@ package common;
 message Header
 {
   required int32 cmdid = 1;
-  optional int32 version = 2;
+  required int32 bodylen = 2;
+  optional int32 version = 3;
 };
 
 message PaxosMsg
