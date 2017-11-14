@@ -32,7 +32,7 @@ func newCommitContext(instance *Instance) *CommitContext {
     instance: instance,
     wait:     make(chan bool),
   }
-  context.newCommit(nil, nil)
+  //context.newCommit(nil, nil)
 
   return context
 }

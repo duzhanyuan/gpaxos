@@ -13,16 +13,24 @@ import (
 
 const DEFAULT_BUF_SIZE = 1024
 
-type PaxosSessionFactory struct {
-
+type MsgHandler interface {
+  OnReceiveMsg(msg []byte, cmd int32) error
 }
 
-func NewPaxosSessionFactory() *PaxosSessionFactory{
-  return &PaxosSessionFactory{}
+type PaxosSessionFactory struct {
+  handler MsgHandler
+}
+
+func NewPaxosSessionFactory(handler MsgHandler) *PaxosSessionFactory{
+  return &PaxosSessionFactory{
+    handler:handler,
+  }
 }
 
 func (self *PaxosSessionFactory) Create(conn net.Conn) network.Session {
-  return newPaxosSession(conn)
+  session := newPaxosSession(conn)
+  session.handler = self.handler
+  return session
 }
 
 const (
@@ -37,8 +45,10 @@ type PaxosSession struct {
   state int
   defaultBuf []byte
   body []byte
+  msgBuf []byte
   bufLen int
   bodyStartPos int32
+  handler MsgHandler
 }
 
 func newPaxosSession(conn net.Conn) *PaxosSession {
@@ -46,7 +56,22 @@ func newPaxosSession(conn net.Conn) *PaxosSession {
     conn:conn,
     defaultBuf:make([] byte, DEFAULT_BUF_SIZE),
     bufLen:DEFAULT_BUF_SIZE,
+    state:ACCEPTING_HEADER,
   }
+}
+
+func (self *PaxosSession) isInvalidHeader() bool {
+  cmd := self.header.GetCmdid()
+  if cmd == common.MsgCmd_PaxosMsg {
+    return true
+  }
+
+  if cmd == common.MsgCmd_CheckpointMsg {
+    return true
+  }
+
+  log.Error("invalid cmd id %d from %s", cmd, self.conn.RemoteAddr())
+  return false
 }
 
 func (self *PaxosSession) recvHeader() error {
@@ -73,10 +98,17 @@ func (self *PaxosSession) recvHeader() error {
     return common.ErrInvalidMsg
   }
 
+  if !self.isInvalidHeader() {
+    return common.ErrInvalidMsg
+  }
+
   self.state = ACCEPTING_BODY
   return nil
 }
 
+func (self *PaxosSession) dispatchMsg() error {
+  return self.handler.OnReceiveMsg(self.msgBuf, self.header.GetCmdid())
+}
 
 func (self *PaxosSession) recvBody() error {
   conn := self.conn
@@ -84,46 +116,27 @@ func (self *PaxosSession) recvBody() error {
   var body [] byte
   body = self.defaultBuf
   endPos := self.bodyStartPos + bodyLen
-  io.ReadFull(conn, body[self.bodyStartPos:endPos])
-  buf, _ := unpackBaseMsg(self.defaultBuf[:endPos], &self.header)
-  log.Debug("body:%s", string(buf))
-
-  return nil
-}
-/*
-func (self *PaxosSession) recvBody() error {
-  conn := self.conn
-  bodyLen := self.header.GetBodylen()
-  var body [] byte
-  if bodyLen > DEFAULT_BUF_SIZE {
-    body = make([]byte, bodyLen)
-  } else {
-    body = self.defaultBuf
-  }
-  endPos := self.bodyStartPos + bodyLen
   n, err := io.ReadFull(conn, body[self.bodyStartPos:endPos])
   if n != int(bodyLen) || err != nil {
     log.Error("recv body error from %s: %v", conn.RemoteAddr().String(), err)
     return common.ErrInvalidMsg
   }
-
-  self.body = body[self.bodyStartPos:endPos - int32(util.UINT32SIZE)]
-
-  crcCksumbuf := body[endPos - int32(util.UINT32SIZE) : endPos]
-  var cksum uint32
-  util.DecodeUint32(crcCksumbuf, 0, &cksum)
-
-  calCksum := util.Crc32(0, self.defaultBuf[util.UINT16SIZE:endPos - int32(util.UINT32SIZE)], common.NET_CRC32SKIP)
-  if cksum != calCksum {
-    log.Error("recv invalid body from %s", conn.RemoteAddr().String())
+  buf, err := unpackBaseMsg(self.defaultBuf[:endPos], &self.header)
+  if err != nil {
+    log.Error("recv body error from %s: %v", conn.RemoteAddr().String(), err)
     return common.ErrInvalidMsg
+  }
+  self.msgBuf = buf
+  log.Debug("body:%s", string(self.msgBuf))
+  err = self.dispatchMsg()
+  if err != nil {
+    log.Error("handle msg from %s error %v", self.conn.RemoteAddr(), err)
+    return err
   }
 
   self.state = ACCEPTING_HEADER
-  log.Error("body: %s\n", string(self.body))
   return nil
 }
-*/
 
 func (self *PaxosSession) Handle() {
   conn := self.conn

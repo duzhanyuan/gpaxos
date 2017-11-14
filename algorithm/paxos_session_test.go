@@ -9,6 +9,14 @@ import (
   "time"
 )
 
+type TestMsgHandler struct {
+
+}
+
+func (self *TestMsgHandler) OnReceiveMsg(msg []byte, cmd int32) error {
+  return nil
+}
+
 func Test_basic(t *testing.T) {
   log.NewConsoleLogger()
 
@@ -29,14 +37,14 @@ func Test_basic(t *testing.T) {
     NodeList: nodeList,
   }
 
-  net1 := network.NewNetwork(options1, NewPaxosSessionFactory())
-  network.NewNetwork(options2, NewPaxosSessionFactory())
+  net1 := network.NewNetwork(options1, NewPaxosSessionFactory(&TestMsgHandler{}))
+  net2 := network.NewNetwork(options2, NewPaxosSessionFactory(&TestMsgHandler{}))
 
   base := Base{}
-  buf, _,_ := base.packBaseMsg([]byte("test"), 100)
+  buf, _,_ := base.packBaseMsg([]byte("test"), 1)
 
   net1.SendMessage(node2.Id,buf)
-  //SendMessage(node1.Id,buf)
+  net2.SendMessage(node1.Id,buf)
 
   time.Sleep(1 * time.Second)
   fmt.Printf("OK")

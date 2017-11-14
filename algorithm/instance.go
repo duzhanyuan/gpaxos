@@ -10,7 +10,6 @@ import (
   "github.com/lichuang/gpaxos"
   "github.com/lichuang/gpaxos/util"
   "github.com/golang/protobuf/proto"
-  "net"
 )
 
 type Instance struct {
@@ -39,13 +38,13 @@ func NewInstance(config *config.Config, options *gpaxos.Options, logstorage *log
     end:make(chan bool),
     commitChan:make(chan CommitMsg),
   }
+  instance.initNetwork(options)
 
   instance.commitctx = newCommitContext(instance)
   instance.committer = newCommitter(instance)
   instance.proposer = newProposer(instance)
   instance.learner = newLearner(instance)
-
-  instance.initNetwork(options)
+  instance.acceptor = NewAcceptor(instance)
 
   start := make(chan bool)
   go instance.main(start)
@@ -55,13 +54,8 @@ func NewInstance(config *config.Config, options *gpaxos.Options, logstorage *log
 }
 
 func (self *Instance)initNetwork(options *gpaxos.Options) *Instance {
-  self.transport = network.NewNetwork(options, NewPaxosSessionFactory())
+  self.transport = network.NewNetwork(options, NewPaxosSessionFactory(self))
   return self
-}
-
-// for ConnectionHandler interface
-func (self *Instance) Handle(conn net.Conn) {
-
 }
 
 func (self *Instance) main(start chan bool) {
@@ -83,6 +77,7 @@ func (self *Instance) main(start chan bool) {
 
 // try to propose a value, return instanceid end error
 func (self *Instance) Propose(value []byte) (uint64, error) {
+  log.Debug("try to propose value %s", string(value))
   return self.committer.NewValue(value)
 }
 
@@ -232,6 +227,19 @@ func (self *Instance) OnReceivePaxosMsg(msg *common.PaxosMsg, isRetry bool) erro
   // handle paxos prepare and accept reply msg
   if (msgType == common.MsgType_PaxosPrepareReply || msgType == common.MsgType_PaxosAcceptReply) {
     return self.receiveMsgForProposer(msg)
+  }
+
+  return nil
+}
+
+func (self *Instance)OnReceiveMsg(buffer []byte, cmd int32) error {
+  if cmd == common.MsgCmd_PaxosMsg {
+    var msg common.PaxosMsg
+    err := proto.Unmarshal(buffer, &msg)
+    if err != nil {
+      return err
+    }
+    return self.OnReceivePaxosMsg(&msg, false)
   }
 
   return nil

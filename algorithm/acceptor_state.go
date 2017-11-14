@@ -25,6 +25,8 @@ func newAcceptorState(config *config.Config, logStorage *logstorage.LogStorage) 
     config:    config,
     paxosLog:  logstorage.NewPaxosLog(logStorage),
     syncTimes: 0,
+    acceptedNum:NewBallotNumber(0, 0),
+    promiseNum:NewBallotNumber(0,0),
   }
   acceptorState.init()
 

@@ -192,7 +192,7 @@ func (self *Base) setAsTestNode() {
 
 // common function
 func unpackBaseMsg(buffer []byte, header *common.Header) (body []byte, err error) {
-  var bufferLen int32 = int32(len(buffer))
+  var bufferLen = int32(len(buffer))
 
   bodyStartPos := bufferLen - header.GetBodylen()
 

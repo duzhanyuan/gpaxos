@@ -19,9 +19,9 @@ type Acceptor struct {
 
 func NewAcceptor(instance *Instance) *Acceptor{
   return &Acceptor{
-    Base:          newBase(instance),
+    Base:  newBase(instance),
     state: newAcceptorState(instance.config, instance.logStorage),
-    config:        instance.config,
+    config:instance.config,
   }
 }
 
@@ -36,13 +36,14 @@ func (self *Acceptor) Init() error {
     log.Info("empty database")
   }
 
-  self.SetInstanceId(instanceId)
+  self.setInstanceId(instanceId)
 
   log.Info("OK")
 
   return nil
 }
 
+/*
 func (self *Acceptor) GetInstanceId() uint64 {
   return self.Base.GetInstanceId()
 }
@@ -51,6 +52,7 @@ func (self *Acceptor) SetInstanceId(instanceId uint64) {
   self.Base.setInstanceId(instanceId)
 }
 
+*/
 func (self *Acceptor) InitForNewPaxosInstance() {
   self.state.init()
 }
