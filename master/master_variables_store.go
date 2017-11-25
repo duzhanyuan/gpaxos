@@ -2,22 +2,22 @@ package master
 
 import (
   "github.com/lichuang/gpaxos/common"
-  "github.com/lichuang/gpaxos/logstorage"
+  "github.com/lichuang/gpaxos/storage"
   "github.com/golang/protobuf/proto"
   log "github.com/lichuang/log4go"
 )
 
 type MasterVariablesStore struct {
-  LogStorage *logstorage.LogStorage
+  LogStorage *storage.LogStorage
 }
 
-func NewMasterVariablesStore(storage *logstorage.LogStorage) *MasterVariablesStore {
+func NewMasterVariablesStore(storage *storage.LogStorage) *MasterVariablesStore {
   return &MasterVariablesStore{
     LogStorage:storage,
   }
 }
 
-func (self *MasterVariablesStore) Write(options logstorage.WriteOptions, groupIdx int32,
+func (self *MasterVariablesStore) Write(options storage.WriteOptions, groupIdx int32,
   variables common.MasterVariables) error {
   buffer, err := proto.Marshal(&variables)
   if err != nil {

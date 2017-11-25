@@ -3,12 +3,12 @@ package config
 /*
 import (
   "github.com/lichuang/gpaxos"
-  "github.com/lichuang/gpaxos/logstorage"
+  "github.com/lichuang/gpaxos/storage"
 )
 
 import (
   "github.com/lichuang/gpaxos/common"
-  "github.com/lichuang/gpaxos/logstorage"
+  "github.com/lichuang/gpaxos/storage"
   "github.com/golang/protobuf/proto"
   "github.com/lichuang/gpaxos"
   "errors"
@@ -23,19 +23,19 @@ type SystemStateMachine struct {
   myGroupIdx      int32
   myNodeId        uint64
   systemVariables *common.SystemVariables
-  systemStore     *logstorage.SystemVariablesStore
+  systemStore     *storage.SystemVariablesStore
 
   nodeIdMap                 map[uint64]bool
   membershipChangedCallback MembershipChangedCallback
 }
 
 func NewSystemStateMachine(groupIdx int32, myNodeId uint64,
-  storage *logstorage.LogStorage,
+  storage *storage.LogStorage,
   callback MembershipChangedCallback) *SystemStateMachine {
   return &SystemStateMachine{
     myGroupIdx:                groupIdx,
     myNodeId:                  myNodeId,
-    systemStore:               logstorage.NewSystemVariablesStore(storage),
+    systemStore:               storage.NewSystemVariablesStore(storage),
     nodeIdMap:                 make(map[uint64]bool),
     membershipChangedCallback: callback,
   }
@@ -60,7 +60,7 @@ func (self *SystemStateMachine) Init() error {
 }
 
 func (self *SystemStateMachine) UpdateSystemVariables(variables *common.SystemVariables) error {
-  options := logstorage.WriteOptions{
+  options := storage.WriteOptions{
     Sync: true,
   }
 

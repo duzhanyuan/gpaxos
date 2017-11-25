@@ -2,7 +2,7 @@ package algorithm
 
 import (
   "github.com/lichuang/gpaxos/common"
-  "github.com/lichuang/gpaxos/logstorage"
+  "github.com/lichuang/gpaxos/storage"
 
   log "github.com/lichuang/log4go"
   "github.com/lichuang/gpaxos/util"
@@ -12,7 +12,7 @@ import (
 type Learner struct {
   Base
   instance                         *Instance
-  paxosLog                         *logstorage.PaxosLog
+  paxosLog                         *storage.PaxosLog
   acceptor                         *Acceptor
   state                            *LearnerState
   isImLearning                     bool

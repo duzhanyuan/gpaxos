@@ -3,7 +3,7 @@ package algorithm
 import (
   "github.com/lichuang/gpaxos/config"
   "github.com/lichuang/gpaxos/common"
-  "github.com/lichuang/gpaxos/logstorage"
+  "github.com/lichuang/gpaxos/storage"
   "github.com/lichuang/gpaxos/util"
   "github.com/golang/protobuf/proto"
 
@@ -15,12 +15,12 @@ type AcceptorState struct {
   acceptedNum  *BallotNumber
   acceptValues []byte
   checkSum     uint32
-  paxosLog     *logstorage.PaxosLog
+  paxosLog     *storage.PaxosLog
   config       *config.Config
   syncTimes    int32
 }
 
-func newAcceptorState(config *config.Config, paxosLog *logstorage.PaxosLog) *AcceptorState {
+func newAcceptorState(config *config.Config, paxosLog *storage.PaxosLog) *AcceptorState {
   acceptorState := &AcceptorState{
     config:    config,
     paxosLog:  paxosLog,
@@ -84,7 +84,7 @@ func (self *AcceptorState) Persist(instanceid uint64, lastCheckSum uint32) error
     Checksum:       proto.Uint32(self.checkSum),
   }
 
-  var options = logstorage.WriteOptions{
+  var options = storage.WriteOptions{
     Sync: self.config.LogSync(),
   }
 

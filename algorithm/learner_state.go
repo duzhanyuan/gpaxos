@@ -6,7 +6,7 @@ import (
   "github.com/lichuang/gpaxos/config"
   "github.com/lichuang/gpaxos/common"
   "github.com/lichuang/gpaxos/util"
-  "github.com/lichuang/gpaxos/logstorage"
+  "github.com/lichuang/gpaxos/storage"
 
   log "github.com/lichuang/log4go"
 )
@@ -16,7 +16,7 @@ type LearnerState struct {
   learnedValue []byte
   isLearned    bool
   newChecksum  uint32
-  paxosLog     *logstorage.PaxosLog
+  paxosLog     *storage.PaxosLog
 }
 
 func NewLearnerState(instance *Instance) *LearnerState {
@@ -58,13 +58,13 @@ func (self *LearnerState) LearnValue(instanceId uint64, learnedBallot BallotNumb
     Checksum:       proto.Uint32(self.newChecksum),
   }
 
-  options := logstorage.WriteOptions{
+  options := storage.WriteOptions{
     Sync: false,
   }
 
   err := self.paxosLog.WriteState(options, instanceId, state)
   if err != nil {
-    log.Error("logstorage writestate fail, instanceid %d valuelen %d err %v",
+    log.Error("storage writestate fail, instanceid %d valuelen %d err %v",
       instanceId, len(value), err)
     return err
   }

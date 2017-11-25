@@ -3,7 +3,7 @@ package algorithm
 import (
   "github.com/lichuang/gpaxos/config"
   "github.com/lichuang/gpaxos/common"
-  "github.com/lichuang/gpaxos/logstorage"
+  "github.com/lichuang/gpaxos/storage"
   "sync"
   "github.com/lichuang/gpaxos/util"
   "time"
@@ -14,7 +14,7 @@ import (
 type LearnerSender struct {
   config          *config.Config
   learner         *Learner
-  paxosLog        *logstorage.PaxosLog
+  paxosLog        *storage.PaxosLog
   isSending       bool
   beginInstanceID uint64
   sendToNodeID    uint64

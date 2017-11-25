@@ -3,7 +3,7 @@ package config
 /*
 import (
   "sync"
-  "github.com/lichuang/gpaxos/logstorage"
+  "github.com/lichuang/gpaxos/storage"
   "github.com/lichuang/gpaxos/common"
   "github.com/lichuang/gpaxos/master"
   "github.com/lichuang/gpaxos/util"
@@ -31,7 +31,7 @@ type MasterStateMachine struct {
 }
 
 func NewMasterStateMachine(groupIdx int32, myNodeId uint64,
-  storage *logstorage.LogStorage) *MasterStateMachine {
+  storage *storage.LogStorage) *MasterStateMachine {
   return &MasterStateMachine{
     myGroupIdx: groupIdx,
     myNodeId:myNodeId,
@@ -77,7 +77,7 @@ func (self *MasterStateMachine) UpdateMasterToStore(masterNodeId uint64, version
     LeaseTime:proto.Uint32(uint32(leaseTime)),
   }
 
-  options := logstorage.WriteOptions{
+  options := storage.WriteOptions{
     Sync:false,
   }
 

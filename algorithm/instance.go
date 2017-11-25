@@ -3,7 +3,7 @@ package algorithm
 import (
   "github.com/lichuang/gpaxos/common"
   "github.com/lichuang/gpaxos/config"
-  "github.com/lichuang/gpaxos/logstorage"
+  "github.com/lichuang/gpaxos/storage"
   "github.com/lichuang/gpaxos/network"
 
   log "github.com/lichuang/log4go"
@@ -14,8 +14,8 @@ import (
 
 type Instance struct {
   config *config.Config
-  logStorage *logstorage.LogStorage
-  paxosLog     *logstorage.PaxosLog
+  logStorage *storage.LogStorage
+  paxosLog     *storage.PaxosLog
   committer *Committer
   commitctx *CommitContext
   proposer *Proposer
@@ -32,14 +32,14 @@ type Instance struct {
   commitChan chan CommitMsg
 }
 
-func NewInstance(config *config.Config, logStorage *logstorage.LogStorage) *Instance {
+func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instance {
   instance := &Instance{
-    config:config,
-    logStorage:logStorage,
-    paxosLog:  logstorage.NewPaxosLog(logStorage),
-    timerThread:util.NewTimerThread(),
-    end:make(chan bool),
-    commitChan:make(chan CommitMsg),
+    config:      config,
+    logStorage:  logStorage,
+    paxosLog:    storage.NewPaxosLog(logStorage),
+    timerThread: util.NewTimerThread(),
+    end:         make(chan bool),
+    commitChan:  make(chan CommitMsg),
   }
   instance.initNetwork(config.GetOptions())
 
@@ -78,6 +78,14 @@ func (self *Instance) main(start chan bool) {
     }
     break
   }
+}
+
+func (self *Instance) Status(instanceId uint64) Status {
+  if instanceId <= self.acceptor.GetInstanceId() {
+    return Decided
+  }
+
+  return Pending
 }
 
 // try to propose a value, return instanceid end error

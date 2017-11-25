@@ -1,4 +1,4 @@
-package logstorage
+package storage
 
 import (
   "github.com/golang/protobuf/proto"
