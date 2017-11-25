@@ -127,7 +127,6 @@ func (self *PaxosSession) recvBody() error {
     return common.ErrInvalidMsg
   }
   self.msgBuf = buf
-  log.Debug("body:%s", string(self.msgBuf))
   err = self.dispatchMsg()
   if err != nil {
     log.Error("handle msg from %s error %v", self.conn.RemoteAddr(), err)

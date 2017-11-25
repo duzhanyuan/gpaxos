@@ -31,7 +31,7 @@ func NewLearnerSender(instance *Instance, learner *Learner) *LearnerSender {
   sender := &LearnerSender{
     config:   instance.config,
     learner:  learner,
-    paxosLog: logstorage.NewPaxosLog(instance.logStorage),
+    paxosLog: instance.paxosLog,
     isEnd:    false,
     isStart:  false,
   }

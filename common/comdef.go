@@ -6,8 +6,8 @@ import (
 )
 
 const (
-  CRC32_SKIP    = 8
-  NET_CRC32SKIP = 7
+  CRC32_SKIP    = 0
+  NET_CRC32SKIP = 0
 )
 
 const Version = 1
@@ -47,7 +47,7 @@ const (
   MsgType_PaxosLearner_ProposerSendSuccess = 7
   MsgType_PaxosProposal_SendNewValue       = 8
   MsgType_PaxosLearner_SendNowInstanceID   = 9
-  MsgType_PaxosLearner_ComfirmAskforLearn  = 10
+  MsgType_PaxosLearner_ConfirmAskforLearn  = 10
   MsgType_PaxosLearner_SendLearnValue_Ack  = 11
   MsgType_PaxosLearner_AskforCheckpoint    = 12
   MsgType_PaxosLearner_OnAskforCheckpoint  = 13

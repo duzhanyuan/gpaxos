@@ -19,8 +19,8 @@ const (
   BroadcastMessage_Type_RunSelf_None
 )
 
-var HEADLEN_LEN int32 = int32(binary.Size(uint16(0)))
-var CHECKSUM_LEN int32 = int32(binary.Size(uint32(0)))
+var HEADLEN_LEN = int32(binary.Size(uint16(0)))
+var CHECKSUM_LEN = int32(binary.Size(uint32(0)))
 
 type Base struct {
   instanceId uint64
@@ -40,7 +40,7 @@ func newBase(instance *Instance) Base {
     config:instance.config,
     transport:instance.transport,
     instance:instance,
-    instanceId:0,
+    instanceId:1,
     isTestNode:false,
   }
 }
@@ -127,11 +127,13 @@ func (self *Base) sendCheckpointMessage(sendToNodeid uint64, msg *common.Checkpo
 
 func (self *Base) sendPaxosMessage(sendToNodeid uint64, msg *common.PaxosMsg) error {
   if sendToNodeid == self.config.GetMyNodeId() {
+    log.Error("no need send to self")
     return nil
   }
 
   buffer, _, err := self.packPaxosMsg(msg)
   if err != nil {
+    log.Error("pack paxos msg error %v", err)
     return err
   }
 

@@ -2,6 +2,7 @@ package gpaxos
 
 import (
   "github.com/lichuang/gpaxos/util"
+  "fmt"
 )
 
 type Node struct {
@@ -17,6 +18,10 @@ type Options struct {
 }
 
 type NodeList []*Node
+
+func (self *Node)String() string {
+  return fmt.Sprintf("%s:%d", self.Ip, self.Port)
+}
 
 func makeNodeId(node *Node) *Node{
   ip := util.Inet_addr(node.Ip)

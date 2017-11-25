@@ -20,10 +20,10 @@ type AcceptorState struct {
   syncTimes    int32
 }
 
-func newAcceptorState(config *config.Config, logStorage *logstorage.LogStorage) *AcceptorState {
+func newAcceptorState(config *config.Config, paxosLog *logstorage.PaxosLog) *AcceptorState {
   acceptorState := &AcceptorState{
     config:    config,
-    paxosLog:  logstorage.NewPaxosLog(logStorage),
+    paxosLog:  paxosLog,
     syncTimes: 0,
     acceptedNum:NewBallotNumber(0, 0),
     promiseNum:NewBallotNumber(0,0),

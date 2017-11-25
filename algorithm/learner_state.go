@@ -20,14 +20,14 @@ type LearnerState struct {
 }
 
 func NewLearnerState(instance *Instance) *LearnerState {
-  paxosLog := logstorage.NewPaxosLog(instance.logStorage)
-
-  return &LearnerState{
+  state := &LearnerState{
     config:      instance.config,
-    paxosLog:    paxosLog,
-    isLearned:   false,
-    newChecksum: 0,
+    paxosLog:    instance.paxosLog,
   }
+
+  state.Init()
+
+  return state
 }
 
 func (self *LearnerState) GetNewChecksum() uint32 {
@@ -36,7 +36,8 @@ func (self *LearnerState) GetNewChecksum() uint32 {
 
 func (self *LearnerState) LearnValueWithoutWrite(instanceId uint64, value []byte, checksum uint32) {
   self.learnedValue = util.CopyBytes(value)
-  self.isLearned = false
+  log.Debug("learn value:%s", string(self.learnedValue))
+  self.isLearned = true
   self.newChecksum = checksum
 }
 
@@ -77,7 +78,7 @@ func (self *LearnerState) GetLearnValue() []byte {
   return self.learnedValue
 }
 
-func (self *LearnerState) GetIsLearned() bool {
+func (self *LearnerState) IsLearned() bool {
   return self.isLearned
 }
 

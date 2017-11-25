@@ -5,6 +5,10 @@ import (
   "github.com/lichuang/gpaxos"
 )
 
+const (
+  MaxTryCount = 3
+)
+
 type Committer struct {
   config    *config.Config
   commitCtx *CommitContext
@@ -31,8 +35,9 @@ func (self *Committer) NewValue(value []byte) (uint64, error) {
 func (self *Committer) newValueGetID(value []byte, context *gpaxos.StateMachineContext) (uint64, error) {
   err := gpaxos.PaxosTryCommitRet_OK
   var instanceid uint64
-  for retryCnt := 3; retryCnt > 0; retryCnt-- {
+  for retryCnt := MaxTryCount; retryCnt > 0; retryCnt-- {
     instanceid, err = self.newValueGetIDNoRetry(value, context)
+
     if err != gpaxos.PaxosTryCommitRet_Conflict {
       break
     }

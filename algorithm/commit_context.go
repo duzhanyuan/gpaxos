@@ -6,6 +6,7 @@ import (
   "bytes"
   "sync"
   "github.com/lichuang/gpaxos/util"
+  "time"
 )
 
 type CommitContext struct {
@@ -116,22 +117,26 @@ func (self *CommitContext) setResult(commitret error, instanceId uint64, learnVa
 }
 
 func (self *CommitContext) getResult() (uint64, error) {
-  /*
-  for !self.IsCommitEnd {
-    self.Serialock.WaitFor(1000)
+  timer := time.NewTimer(100 * time.Millisecond)
+  select {
+  case <- timer.C:
+    break
+  case <- self.wait:
+    break
   }
 
-  if self.CommitRet == nil {
-    *succInstanceId = self.InstanceId
-    log.Info("commit success, instanceid %d", self.InstanceId)
-  } else {
-    log.Error("commit fail: %v", self.CommitRet)
+  if !timer.Stop() {
+    select {
+    // otherwise should wait timer
+    case <- timer.C:
+    default:
+    }
   }
 
-  self.Serialock.Unlock()
-  */
-
-  <-self.wait
   self.end = util.NowTimeMs()
+  if self.commitRet == gpaxos.PaxosTryCommitRet_OK {
+    return self.instanceId, self.commitRet
+  }
+
   return 0, self.commitRet
 }

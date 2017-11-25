@@ -29,7 +29,7 @@ type Proposer struct {
   //timeStat             *util.TimeStat
 }
 
-func newProposer(instance *Instance) *Proposer {
+func NewProposer(instance *Instance) *Proposer {
   proposer := &Proposer{
     Base:        newBase(instance),
     config:      instance.config,
@@ -48,6 +48,14 @@ func newProposer(instance *Instance) *Proposer {
 func (self *Proposer) initForNewPaxosInstance() {
   self.msgCounter.StartNewRound()
   self.state.init()
+
+  self.exitPrepare()
+  self.exitAccept()
+}
+
+func (self *Proposer) NewInstance() {
+  self.Base.newInstance()
+  self.initForNewPaxosInstance()
 }
 
 func (self *Proposer) setStartProposalID(proposalId uint64) {
@@ -78,8 +86,8 @@ func (self *Proposer) prepare(needNewBallot bool) {
   base := self.Base
   state := self.state
 
-  log.Info("start now.instanceid %d mynodeid %d state.proposal id %d state.valuelen %d",
-    base.GetInstanceId(), self.config.GetMyNodeId(), state.GetProposalId(), len(state.GetValue()))
+  log.Info("[%s]start now.instanceid %d mynodeid %d state.proposal id %d state.valuelen %d",
+    self.instance.String(),base.GetInstanceId(), self.config.GetMyNodeId(), state.GetProposalId(), len(state.GetValue()))
 
   // first reset all state
   self.exitAccept()
@@ -140,12 +148,8 @@ func (self *Proposer) addAcceptTimer(timeOutMs uint32) {
   self.acceptTimerId = self.timerThread.AddTimer(now + uint64(timeOutMs), AcceptTimer, self)
 }
 
-func (self *Proposer) getInstanceId() uint64 {
-  return self.Base.GetInstanceId()
-}
-
 func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) error {
-  log.Info("START ")
+  log.Info("[%s]START ", self.instance.String())
 
   if self.state.state != PREPARE {
     return nil
@@ -178,7 +182,7 @@ func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) error {
 }
 
 func (self *Proposer) accept() {
-  log.Info("")
+  log.Info("[%s]start accept", self.instance.String())
 
   self.exitAccept()
   self.state.setState(ACCEPT)
@@ -203,9 +207,10 @@ func (self *Proposer) accept() {
 }
 
 func (self *Proposer) OnAcceptReply(msg *common.PaxosMsg) error {
-  log.Info("")
-
   state := self.state
+  log.Info("[%s]START msg.proposalId %d, state.proposalId %d, msg.from %d, rejectby %d",
+    self.instance.String(), msg.GetProposalID(), state.GetProposalId(), msg.GetNodeID(), msg.GetRejectByPromiseID())
+
   base := self.Base
 
   if state.state != ACCEPT {
@@ -228,14 +233,16 @@ func (self *Proposer) OnAcceptReply(msg *common.PaxosMsg) error {
   if msgCounter.IsPassedOnThisRound() {
     self.exitAccept()
     self.learner.ProposerSendSuccess(base.GetInstanceId(), state.GetProposalId())
+    log.Info("[%s]instance %d passed", self.instance.String(), msg.GetInstanceID())
   } else {
     self.addAcceptTimer(30)
   }
 
+  log.Info("OnAcceptReply END")
   return nil
 }
 
 func (self *Proposer)OnTimeout(timer *util.Timer) {
-  log.Debug("proposer timeout type:%d", timer.TimerType)
+  log.Debug("[%s]proposer timeout type:%d", self.instance.String(),timer.TimerType)
 
 }

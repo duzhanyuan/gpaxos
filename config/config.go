@@ -3,6 +3,7 @@ package config
 import (
   "github.com/lichuang/gpaxos/common"
   "github.com/lichuang/gpaxos/util"
+  "github.com/lichuang/gpaxos"
 )
 
 type Config struct {
@@ -11,6 +12,20 @@ type Config struct {
   //systemStateMachine *SystemStateMachine
   //masterStateMachine *MasterStateMachine
   myFollowerMaps     map[uint64]uint64
+
+  options   *gpaxos.Options
+  majorCnt int
+}
+
+func NewConfig(options *gpaxos.Options) *Config{
+  return &Config{
+    options:options,
+    majorCnt:(len(options.NodeList) / 2) + 1,
+  }
+}
+
+func (self *Config) GetOptions() *gpaxos.Options {
+  return self.options
 }
 
 func (self *Config) LogSync() bool {
@@ -26,11 +41,11 @@ func (self *Config) GetGid() uint64 {
 }
 
 func (self *Config) GetMyNodeId() uint64 {
-  return 0
+  return self.options.MyNode.Id
 }
 
 func (self *Config) GetMajorityCount() int {
-  return 0
+  return self.majorCnt
 }
 
 func (self *Config) GetNodeCount() int {

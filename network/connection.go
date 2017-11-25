@@ -27,6 +27,9 @@ func (self *Connection) Send(msg []byte) bool {
   }
 
   n, err := self.conn.Write(msg)
+  if err != nil {
+    log.Error("send error %v", err)
+  }
   return n == len(msg) && err == nil
 }
 

@@ -18,11 +18,13 @@ type Acceptor struct {
 }
 
 func NewAcceptor(instance *Instance) *Acceptor{
-  return &Acceptor{
+  acceptor := &Acceptor{
     Base:  newBase(instance),
-    state: newAcceptorState(instance.config, instance.logStorage),
+    state: newAcceptorState(instance.config, instance.paxosLog),
     config:instance.config,
   }
+
+  return acceptor
 }
 
 func (self *Acceptor) Init() error {
@@ -59,7 +61,7 @@ func (self *Acceptor) InitForNewPaxosInstance() {
 
 func (self *Acceptor) NewInstance() {
   self.Base.newInstance()
-  self.state.init()
+  self.InitForNewPaxosInstance()
 }
 
 func (self *Acceptor) GetAcceptorState() *AcceptorState {
@@ -68,8 +70,8 @@ func (self *Acceptor) GetAcceptorState() *AcceptorState {
 
 // handle paxos prepare msg
 func (self *Acceptor) onPrepare(msg *common.PaxosMsg) error {
-  log.Info("start prepare msg instanceid %d, from %d, proposalid %d",
-    msg.GetInstanceID(), msg.GetNodeID(), msg.GetProposalID())
+  log.Info("[%s]start prepare msg instanceid %d, from %d, proposalid %d",
+    self.instance.String(),msg.GetInstanceID(), msg.GetNodeID(), msg.GetProposalID())
 
   reply := &common.PaxosMsg{
     InstanceID: proto.Uint64(self.GetInstanceId()),
@@ -82,8 +84,8 @@ func (self *Acceptor) onPrepare(msg *common.PaxosMsg) error {
   state := self.state
 
   if ballot.BE(state.GetPromiseNum()) {
-    log.Debug("[promise]promiseid %d, promisenodeid %d, preacceptedid %d, preacceptednodeid %d",
-      state.GetPromiseNum().proposalId, state.GetPromiseNum().nodeId,
+    log.Debug("[%s][promise]promiseid %d, promisenodeid %d, preacceptedid %d, preacceptednodeid %d",
+      self.instance.String(),state.GetPromiseNum().proposalId, state.GetPromiseNum().nodeId,
       state.GetAcceptedNum().proposalId, state.GetAcceptedNum().nodeId)
 
     reply.PreAcceptID = proto.Uint64(state.GetAcceptedNum().proposalId)
@@ -108,7 +110,7 @@ func (self *Acceptor) onPrepare(msg *common.PaxosMsg) error {
   }
 
   replyNodeId := msg.GetNodeID()
-  log.Info("end prepare instanceid %d replynodeid %d", self.GetInstanceId(), replyNodeId)
+  log.Info("[%s]end prepare instanceid %d replynodeid %d", self.instance.String(),self.GetInstanceId(), replyNodeId)
 
   self.Base.sendPaxosMessage(replyNodeId, reply)
 
@@ -117,8 +119,8 @@ func (self *Acceptor) onPrepare(msg *common.PaxosMsg) error {
 
 // handle paxos accept msg
 func (self *Acceptor) onAccept(msg *common.PaxosMsg) error {
-  log.Info("start accept msg instanceid %d, from %d, proposalid %d, valuelen %d",
-    msg.GetInstanceID(), msg.GetNodeID(), msg.GetProposalID(), len(msg.Value))
+  log.Info("[%s]start accept msg instanceid %d, from %d, proposalid %d, valuelen %d",
+    self.instance.String(),msg.GetInstanceID(), msg.GetNodeID(), msg.GetProposalID(), len(msg.Value))
 
   reply := &common.PaxosMsg{
     InstanceID: proto.Uint64(self.GetInstanceId()),
@@ -137,7 +139,7 @@ func (self *Acceptor) onAccept(msg *common.PaxosMsg) error {
 
     state.SetPromiseNum(ballot)
     state.SetAcceptedNum(ballot)
-    state.SetAcceptedValue(msg.Value)
+    state.SetAcceptedValue(msg.GetValue())
 
     err := state.Persist(self.GetInstanceId(), self.Base.GetLastChecksum())
     if err != nil {
@@ -152,7 +154,7 @@ func (self *Acceptor) onAccept(msg *common.PaxosMsg) error {
   }
 
   replyNodeId := msg.GetNodeID()
-  log.Info("end accept instanceid %d replynodeid %d", self.GetInstanceId(), replyNodeId)
+  log.Info("[%s]end accept instanceid %d replynodeid %d", self.instance.String(),self.GetInstanceId(), replyNodeId)
 
   self.Base.sendPaxosMessage(replyNodeId, reply)
 

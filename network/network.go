@@ -39,6 +39,7 @@ func NewNetwork(options *gpaxos.Options, factory SessionFactory) *Network {
 }
 
 func (self *Network) SendMessage(nodeid uint64, msg []byte) error {
+  log.Debug("in sendmessage")
   conn, exist := self.connections[nodeid]
   if !exist {
     log.Error("%d not exist", nodeid)

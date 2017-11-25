@@ -24,16 +24,17 @@ type Learner struct {
   timerThread                     *util.TimerThread
 }
 
-func newLearner(instance *Instance) *Learner {
+func NewLearner(instance *Instance) *Learner {
   learner := &Learner{
     Base:                             newBase(instance),
-    paxosLog:                         logstorage.NewPaxosLog(instance.logStorage),
+    paxosLog:                         instance.paxosLog,
     acceptor:                         instance.acceptor,
     isImLearning:                     false,
     highestSeenInstanceID:            0,
     highestSeenInstanceID_fromNodeID: common.NULL_NODEID,
     lastAckInstanceId:                0,
     state:                            NewLearnerState(instance),
+    instance:                         instance,
   }
   learner.sender = NewLearnerSender(instance, learner)
 
@@ -50,8 +51,13 @@ func (self *Learner) Init() {
   self.sender.Start()
 }
 
+func (self *Learner) NewInstance() {
+  self.Base.newInstance()
+  self.InitForNewPaxosInstance()
+}
+
 func (self *Learner) IsLearned() bool {
-  return self.state.GetIsLearned()
+  return self.state.IsLearned()
 }
 
 func (self *Learner) GetLearnValue() []byte {
@@ -116,7 +122,6 @@ func (self *Learner) askforLearn() {
   base.broadcastMessage(msg, BroadcastMessage_Type_RunSelf_None)
   //self.BroadcastMessageToTempNode(msg, common.Message_SendType_UDP)
 }
-
 
 func (self *Learner) OnAskforLearn(msg *common.PaxosMsg) {
   log.Info("start msg.instanceid %d now.instanceid %d msg.fromnodeid %d",
@@ -271,14 +276,15 @@ func (self *Learner) ProposerSendSuccess(instanceId uint64, proposalId uint64) {
 }
 
 func (self *Learner) OnProposerSendSuccess(msg *common.PaxosMsg) {
-  log.Info("START Msg.InstanceID %d Now.InstanceID %d Msg.ProposalID %d "+
+  log.Info("[%s]OnProposerSendSuccess Msg.InstanceID %d Now.InstanceID %d Msg.ProposalID %d "+
     "State.AcceptedID %d State.AcceptedNodeID %d, Msg.from_nodeid %d",
-    msg.GetInstanceID(), self.GetInstanceId(), msg.GetProposalID(),
+    self.instance.String(),msg.GetInstanceID(), self.GetInstanceId(), msg.GetProposalID(),
     self.acceptor.GetAcceptorState().acceptedNum.proposalId,
     self.acceptor.GetAcceptorState().acceptedNum.nodeId,
     msg.GetNodeID())
 
   if msg.GetInstanceID() != self.GetInstanceId() {
+    log.Debug("instance id %d not same as msg instance id %d", self.GetInstanceId(), msg.GetInstanceID())
     return
   }
 
@@ -287,9 +293,10 @@ func (self *Learner) OnProposerSendSuccess(msg *common.PaxosMsg) {
     return
   }
 
-  ballot := NewBallotNumber(msg.GetProposalID(), msg.GetProposalNodeID())
+  ballot := NewBallotNumber(msg.GetProposalID(), msg.GetNodeID())
   if !self.acceptor.GetAcceptorState().acceptedNum.EQ(ballot) {
-    log.Debug("proposal ballot not same to accepted ballot")
+    log.Debug("[%s]proposal ballot %s not same to accepted ballot %s", self.instance.String(),
+      self.acceptor.GetAcceptorState().acceptedNum.String(),ballot.String())
     return
   }
 
@@ -297,7 +304,7 @@ func (self *Learner) OnProposerSendSuccess(msg *common.PaxosMsg) {
     self.acceptor.GetAcceptorState().GetAcceptedValue(),
     self.acceptor.GetAcceptorState().GetChecksum())
 
-  log.Info("end learn value ok")
+  log.Info("learn value instanceid %d ok", msg.GetInstanceID())
   //self.TransmitToFollower()
 }
 
@@ -326,5 +333,4 @@ func (self *Learner) TransmitToFollower() {
 
 func (self *Learner)OnTimeout(timer *util.Timer) {
   log.Debug("learner timeout type:%d", timer.TimerType)
-
 }

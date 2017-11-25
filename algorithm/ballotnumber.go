@@ -1,5 +1,7 @@
 package algorithm
 
+import "fmt"
+
 type BallotNumber struct {
   proposalId uint64
   nodeId     uint64
@@ -10,6 +12,10 @@ func NewBallotNumber(proposalId uint64, nodeId uint64) *BallotNumber {
     proposalId: proposalId,
     nodeId:     nodeId,
   }
+}
+
+func (self *BallotNumber) String() string {
+  return fmt.Sprintf("%d:%d", self.proposalId, self.nodeId)
 }
 
 func (bn *BallotNumber) BE(other *BallotNumber) bool {
