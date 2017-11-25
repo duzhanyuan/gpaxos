@@ -76,7 +76,6 @@ func (self *Instance) main(start chan bool) {
       self.onCommit()
       break
     }
-    break
   }
 }
 
@@ -96,10 +95,12 @@ func (self *Instance) Propose(value []byte) (uint64, error) {
 
 func (self *Instance) sendCommitMsg() {
   self.commitChan <- CommitMsg{}
+  log.Debug("send commit msg")
 }
 
 // handle commit message
 func (self *Instance) onCommit() {
+  log.Debug("[%s]on commit", self.name)
   if !self.commitctx.isNewCommit() {
     return
   }

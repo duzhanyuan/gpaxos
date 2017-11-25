@@ -6,6 +6,7 @@ import (
   "bytes"
   "sync"
   "github.com/lichuang/gpaxos/util"
+  log "github.com/lichuang/log4go"
   "time"
 )
 
@@ -97,6 +98,7 @@ func (self *CommitContext) setResult(commitret error, instanceId uint64, learnVa
   self.mutex.Lock()
 
   if self.commitEnd || self.instanceId != instanceId {
+    log.Error("set result error")
     self.mutex.Unlock()
     return
   }

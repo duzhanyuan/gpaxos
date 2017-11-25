@@ -90,7 +90,7 @@ func Test_Basic(t *testing.T) {
     ind2 == ind + 1,
     "expected %d, get %d", ind + 1, ind2)
 
-  // try many propose
+  // try concurrent propose
   proposeValues := make([]string, 0)
   var waitGroup sync.WaitGroup
   npaxos = 1
