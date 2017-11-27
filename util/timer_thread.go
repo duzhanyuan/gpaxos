@@ -130,10 +130,12 @@ func (self *TimerThread) AddTimer(timeoutMs uint32, timeType int, obj TimerObj) 
 
   self.mutex.Unlock()
 
+  log.Debug("add timer %d", timerId)
   return timerId
 }
 
 func (self *TimerThread) DelTimer(timerId uint32) {
+  log.Debug("delete timer %d", timerId)
   self.mapMutex.Lock()
   delete(self.existTimerIdMap, timerId)
   self.mapMutex.Unlock()

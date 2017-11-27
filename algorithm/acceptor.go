@@ -55,13 +55,13 @@ func (self *Acceptor) SetInstanceId(instanceId uint64) {
 }
 
 */
-func (self *Acceptor) InitForNewPaxosInstance() {
+func (self *Acceptor) InitForNewPaxosInstance(isMyCommit bool) {
   self.state.init()
 }
 
-func (self *Acceptor) NewInstance() {
+func (self *Acceptor) NewInstance(isMyComit bool) {
   self.Base.newInstance()
-  self.InitForNewPaxosInstance()
+  self.InitForNewPaxosInstance(isMyComit)
 }
 
 func (self *Acceptor) GetAcceptorState() *AcceptorState {

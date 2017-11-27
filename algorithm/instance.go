@@ -30,6 +30,7 @@ type Instance struct {
   end chan bool
 
   commitChan chan CommitMsg
+  paxosMsgChan chan *common.PaxosMsg
 }
 
 func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instance {
@@ -40,6 +41,7 @@ func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instanc
     timerThread: util.NewTimerThread(),
     end:         make(chan bool),
     commitChan:  make(chan CommitMsg),
+    paxosMsgChan:  make(chan *common.PaxosMsg, 100),
   }
   instance.initNetwork(config.GetOptions())
 
@@ -74,6 +76,9 @@ func (self *Instance) main(start chan bool) {
       break
     case <-self.commitChan:
       self.onCommit()
+      break
+    case msg := <- self.paxosMsgChan:
+      self.OnReceivePaxosMsg(msg, false)
       break
     }
   }
@@ -122,9 +127,9 @@ func (self *Instance) onCommit() {
   }
 
   // ok, now do commit
-  self.commitctx.startCommit(self.proposer.GetInstanceId())
+  //self.commitctx.StartCommit(self.proposer.GetInstanceId())
 
-  self.proposer.newValue(self.commitctx.getCommitValue())
+  self.proposer.NewValue(self.commitctx.getCommitValue())
 }
 
 func (self *Instance) String() string {
@@ -139,10 +144,10 @@ func (self *Instance) isCheckSumValid(msg *common.PaxosMsg) bool {
   return true
 }
 
-func (self *Instance) NewInstance() {
-  self.acceptor.NewInstance()
-  self.proposer.NewInstance()
-  self.learner.NewInstance()
+func (self *Instance) NewInstance(isMyCommit bool) {
+  self.acceptor.NewInstance(isMyCommit)
+  self.proposer.NewInstance(isMyCommit)
+  self.learner.NewInstance(isMyCommit)
 }
 
 func (self *Instance) receiveMsgForLearner(msg *common.PaxosMsg) error {
@@ -154,10 +159,17 @@ func (self *Instance) receiveMsgForLearner(msg *common.PaxosMsg) error {
     learner.OnProposerSendSuccess(msg)
   }
   if learner.IsLearned() {
-    // this paxos instance end
-    self.commitctx.setResult(gpaxos.PaxosTryCommitRet_OK, learner.GetInstanceId(), learner.GetLearnValue())
+    commitCtx := self.commitctx
+    isMyCommit,_ := commitCtx.IsMyCommit(msg)
+    if isMyCommit {
+      log.Debug("[%s]instance %d is my commit", self.name, learner.GetInstanceId())
+      // this paxos instance end
+      commitCtx.setResult(gpaxos.PaxosTryCommitRet_OK, learner.GetInstanceId(), learner.GetLearnValue())
+    } else {
+      log.Debug("[%s]instance %d is not my commit", self.name, learner.GetInstanceId())
+    }
 
-    self.NewInstance()
+    self.NewInstance(isMyCommit)
 
     log.Info("[%s]new paxos instance has started, Now instance id:proposer %d, acceptor %d, learner %d",
       self.name, self.proposer.GetInstanceId(), self.acceptor.GetInstanceId(), self.learner.GetInstanceId())
@@ -166,7 +178,7 @@ func (self *Instance) receiveMsgForLearner(msg *common.PaxosMsg) error {
 }
 
 func (self *Instance) receiveMsgForProposer(msg *common.PaxosMsg) error {
-  log.Debug("[%s]receive proposer %d",self.name,msg.GetMsgType())
+  log.Debug("[%s]receive proposer msg %d",self.name,msg.GetMsgType())
   if self.config.IsIMFollower() {
     log.Error("[%s]follower skip %d msg", self.name, msg.GetMsgType())
     return nil
@@ -176,6 +188,8 @@ func (self *Instance) receiveMsgForProposer(msg *common.PaxosMsg) error {
   proposerInstanceId := self.proposer.GetInstanceId()
 
   if msgInstanceId != proposerInstanceId {
+    log.Error("[%s]msg instance id %d not same to proposer instance id %d",
+      self.name, msgInstanceId, proposerInstanceId)
     return nil
   }
 
@@ -199,6 +213,7 @@ func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) 
   msgInstanceId := msg.GetInstanceID()
   acceptorInstanceId := self.acceptor.GetInstanceId()
 
+  log.Info("[%s]msg instance %d, acceptor instance %d", self.name, msgInstanceId, acceptorInstanceId)
   // msgInstanceId == acceptorInstanceId + 1  means this instance has been approved
   // so just learn it
   if msgInstanceId == acceptorInstanceId + 1 {
@@ -256,10 +271,12 @@ func (self *Instance) OnReceivePaxosMsg(msg *common.PaxosMsg, isRetry bool) erro
   if msgType == common.MsgType_PaxosPrepare || msgType == common.MsgType_PaxosAccept {
     if !self.config.IsValidNodeID(msg.GetNodeID()) {
       self.config.AddTmpNodeOnlyForLearn(msg.GetNodeID())
+      log.Error("[%s]is not valid node id", self.name)
       return nil
     }
 
     if !self.isCheckSumValid(msg) {
+      log.Error("[%s]checksum invalid", self.name)
       return common.ErrInvalidMsg
     }
 
@@ -291,14 +308,13 @@ func (self *Instance) OnReceivePaxosMsg(msg *common.PaxosMsg, isRetry bool) erro
 }
 
 func (self *Instance)OnReceiveMsg(buffer []byte, cmd int32) error {
-  log.Debug("[%s]recv %d msg", self.name, cmd)
   if cmd == common.MsgCmd_PaxosMsg {
     var msg common.PaxosMsg
     err := proto.Unmarshal(buffer, &msg)
     if err != nil {
       return err
     }
-    return self.OnReceivePaxosMsg(&msg, false)
+    self.paxosMsgChan <- &msg
   }
 
   return nil

@@ -2,6 +2,7 @@ package network
 
 import (
   "net"
+  log "github.com/lichuang/log4go"
 )
 
 type Listener struct {
@@ -18,7 +19,11 @@ func NewListener(addr string, factory SessionFactory) *Listener {
 }
 
 func (self *Listener) Run() {
-  listener, _ := net.Listen("tcp", self.addr)
+  listener, err := net.Listen("tcp", self.addr)
+  if err != nil {
+    log.Error("listen error: %v", err)
+    return
+  }
   self.listener = listener
   go self.main()
 }

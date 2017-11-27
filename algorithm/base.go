@@ -107,7 +107,6 @@ func (self *Base) packBaseMsg(body []byte, cmd int32) (buffer []byte, header *co
   util.EncodeUint32(cksumBuf, 0, ckSum)
 
   buffer = util.AppendBytes(buffer, cksumBuf)
-  log.Debug("pack cksum:%d, len:%d", ckSum, len(buffer))
 
   return
 }

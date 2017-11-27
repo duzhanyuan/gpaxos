@@ -24,7 +24,6 @@ type Proposer struct {
   lastAcceptTimeoutMs  uint32
   canSkipPrepare       bool
   wasRejectBySomeone   bool
-  timeoutInstanceId    uint64
   timerThread          *util.TimerThread
   //timeStat             *util.TimeStat
 }
@@ -34,18 +33,21 @@ func NewProposer(instance *Instance) *Proposer {
     Base:        newBase(instance),
     config:      instance.config,
     state:       newProposalState(instance.config),
-    msgCounter:  newMsgCounter(instance.config),
+    msgCounter:  NewMsgCounter(instance.config),
     learner:     instance.learner,
     timerThread: instance.timerThread,
     //timeStat: util.NewTimeStat(),
   }
 
-  proposer.initForNewPaxosInstance()
+  proposer.InitForNewPaxosInstance(false)
 
   return proposer
 }
 
-func (self *Proposer) initForNewPaxosInstance() {
+func (self *Proposer) InitForNewPaxosInstance(isMyCommit bool) {
+  if !isMyCommit {
+    return
+  }
   self.msgCounter.StartNewRound()
   self.state.init()
 
@@ -53,9 +55,9 @@ func (self *Proposer) initForNewPaxosInstance() {
   self.exitAccept()
 }
 
-func (self *Proposer) NewInstance() {
+func (self *Proposer) NewInstance(isMyComit bool) {
   self.Base.newInstance()
-  self.initForNewPaxosInstance()
+  self.InitForNewPaxosInstance(isMyComit)
 }
 
 func (self *Proposer) setStartProposalID(proposalId uint64) {
@@ -66,7 +68,7 @@ func (self *Proposer) isWorking() bool {
   return self.prepareTimerId > 0 || self.acceptTimerId > 0
 }
 
-func (self *Proposer) newValue(value []byte) {
+func (self *Proposer) NewValue(value []byte) {
   if len(self.state.GetValue()) == 0 {
     self.state.SetValue(value)
   }
@@ -86,8 +88,7 @@ func (self *Proposer) prepare(needNewBallot bool) {
   base := self.Base
   state := self.state
 
-  log.Info("[%s]start now.instanceid %d mynodeid %d state.proposal id %d state.valuelen %d",
-    self.instance.String(),base.GetInstanceId(), self.config.GetMyNodeId(), state.GetProposalId(), len(state.GetValue()))
+  self.instance.commitctx.StartCommit(self.GetInstanceId())
 
   // first reset all state
   self.exitAccept()
@@ -100,6 +101,9 @@ func (self *Proposer) prepare(needNewBallot bool) {
     self.state.newPrepare()
   }
 
+  log.Info("[%s]start now.instanceid %d mynodeid %d state.proposal id %d state.valuelen %d new %v",
+    self.instance.String(),self.GetInstanceId(), self.config.GetMyNodeId(), state.GetProposalId(), len(state.GetValue()), needNewBallot)
+
   // pack paxos prepare msg and broadcast
   msg := &common.PaxosMsg{
     MsgType:    proto.Int32(common.MsgType_PaxosPrepare),
@@ -109,7 +113,7 @@ func (self *Proposer) prepare(needNewBallot bool) {
   }
 
   self.msgCounter.StartNewRound()
-  self.addPrepareTimer(1000)
+  self.addPrepareTimer(100)
 
   base.broadcastMessage(msg, BroadcastMessage_Type_RunSelf_First)
 }
@@ -134,8 +138,8 @@ func (self *Proposer) addPrepareTimer(timeOutMs uint32) {
     self.prepareTimerId = 0
   }
 
-  now := util.NowTimeMs()
-  self.prepareTimerId = self.timerThread.AddTimer(now + uint64(timeOutMs), PrepareTimer, self)
+  self.prepareTimerId = self.timerThread.AddTimer(timeOutMs, PrepareTimer, self)
+  log.Debug("[%s]add prepare timer %d timeout %dms", self.instance.String(), self.prepareTimerId, timeOutMs)
 }
 
 func (self *Proposer) addAcceptTimer(timeOutMs uint32) {
@@ -144,35 +148,41 @@ func (self *Proposer) addAcceptTimer(timeOutMs uint32) {
     self.acceptTimerId = 0
   }
 
-  now := util.NowTimeMs()
-  self.acceptTimerId = self.timerThread.AddTimer(now + uint64(timeOutMs), AcceptTimer, self)
+  self.acceptTimerId = self.timerThread.AddTimer(timeOutMs, AcceptTimer, self)
+  log.Debug("[%s]add accept timer %d timeout %dms", self.instance.String(), self.acceptTimerId, timeOutMs)
 }
 
 func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) error {
-  log.Info("[%s]START ", self.instance.String())
+  log.Info("[%s]OnPrepareReply", self.instance.String())
 
   if self.state.state != PREPARE {
+    log.Error("[%s]proposer state not PREPARE", self.instance.String())
     return nil
   }
 
   if msg.GetProposalID() != self.state.GetProposalId() {
+    log.Error("[%s]msg proposal id %d not same to self proposal id",
+      self.instance.String(), msg.GetProposalID(), self.state.GetProposalId())
     return nil
   }
 
-  self.msgCounter.addReceive(msg.GetNodeID())
+  self.msgCounter.AddReceive(msg.GetNodeID())
 
   if msg.GetRejectByPromiseID() == 0 {
     ballot := NewBallotNumber(msg.GetPreAcceptID(), msg.GetPreAcceptNodeID())
     self.msgCounter.AddPromiseOrAccept(msg.GetNodeID())
     self.state.AddPreAcceptValue(*ballot, msg.GetValue())
+    log.Debug("[%s]prepare accepted", self.instance.String())
   } else {
     self.msgCounter.AddReject(msg.GetNodeID())
     self.wasRejectBySomeone = true
     self.state.SetOtherProposalId(msg.GetRejectByPromiseID())
+    log.Debug("[%s]prepare rejected", self.instance.String())
   }
 
   if self.msgCounter.IsPassedOnThisRound() {
     self.canSkipPrepare = true
+    self.exitPrepare()
     self.accept()
   } else if (self.msgCounter.IsRejectedOnThisRound() || self.msgCounter.IsAllReceiveOnThisRound()){
     self.addPrepareTimer(40)
@@ -214,17 +224,22 @@ func (self *Proposer) OnAcceptReply(msg *common.PaxosMsg) error {
   base := self.Base
 
   if state.state != ACCEPT {
+    log.Error("[%s]proposer state not ACCEPT", self.instance.String())
     return nil
   }
 
   if msg.GetProposalID() != state.GetProposalId() {
+    log.Error("[%s]msg proposal id %d not same to self proposal id",
+      self.instance.String(), msg.GetProposalID(), self.state.GetProposalId())
     return nil
   }
 
   msgCounter := self.msgCounter
   if msg.GetRejectByPromiseID() == 0 {
+    log.Debug("[%s]accept accepted", self.instance.String())
     msgCounter.AddPromiseOrAccept(msg.GetNodeID())
   } else {
+    log.Debug("[%s]accept rejected", self.instance.String())
     msgCounter.AddReject(msg.GetNodeID())
     self.wasRejectBySomeone = true
     state.SetOtherProposalId(msg.GetRejectByPromiseID())
@@ -242,7 +257,23 @@ func (self *Proposer) OnAcceptReply(msg *common.PaxosMsg) error {
   return nil
 }
 
+func (self *Proposer) onPrepareTimeout() {
+  self.prepare(self.wasRejectBySomeone)
+}
+
+func (self *Proposer) onAcceptTimeout() {
+  self.prepare(self.wasRejectBySomeone)
+}
+
 func (self *Proposer)OnTimeout(timer *util.Timer) {
   log.Debug("[%s]proposer timeout type:%d", self.instance.String(),timer.TimerType)
 
+  if timer.TimerType == PrepareTimer {
+    self.onPrepareTimeout()
+    return
+  }
+
+  if timer.TimerType == AcceptTimer {
+    self.onAcceptTimeout()
+  }
 }

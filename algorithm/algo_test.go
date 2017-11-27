@@ -65,6 +65,17 @@ func Test_Basic(t *testing.T) {
     ins = append(ins, in)
   }
 
+  //ins[0].proposer.addPrepareTimer(100)
+  /*
+  {
+    var waitGroup sync.WaitGroup
+    waitGroup.Add(1)
+    waitGroup.Wait()
+  }
+
+  return
+  */
+
   var proposalValue = "test1"
   ind, ret := ins[0].Propose([]byte(proposalValue))
   if ret != gpaxos.PaxosTryCommitRet_OK{
@@ -86,9 +97,12 @@ func Test_Basic(t *testing.T) {
 
   // now try another propose
   ind2, ret := ins[1].Propose([]byte(proposalValue))
+
   util.TestAssert(t,
     ind2 == ind + 1,
-    "expected %d, get %d", ind + 1, ind2)
+    "expected %d, get %d, err:%v", ind + 1, ind2, ret)
+
+    return
 
   // try concurrent propose
   proposeValues := make([]string, 0)

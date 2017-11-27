@@ -58,7 +58,7 @@ func (self *CommitContext) isNewCommit() bool {
   return self.instanceId == common.INVALID_INSTANCEID && self.value != nil
 }
 
-func (self *CommitContext) startCommit(instanceId uint64) {
+func (self *CommitContext) StartCommit(instanceId uint64) {
   self.mutex.Lock()
   self.instanceId = instanceId
   self.mutex.Unlock()
@@ -68,11 +68,21 @@ func (self *CommitContext) getCommitValue() [] byte {
   return self.value
 }
 
-func (self *CommitContext) isMyCommit(instanceId uint64, learnValue []byte)(bool,*gpaxos.StateMachineContext) {
+func (self *CommitContext) IsMyCommit(msg *common.PaxosMsg)(bool,*gpaxos.StateMachineContext) {
   self.mutex.Lock()
+  defer self.mutex.Unlock()
 
   var ctx *gpaxos.StateMachineContext
   isMyCommit := false
+  instanceId := msg.GetInstanceID()
+  learnValue := msg.GetValue()
+  nodeId := msg.GetNodeID()
+
+  if nodeId != self.instance.config.GetMyNodeId() {
+    log.Debug("[%s]msg node id %d is not mynodeid %d", self.instance.String(), nodeId, self.instance.config.GetMyNodeId())
+    return false, nil
+  }
+  return true, nil
 
   if !self.commitEnd && self.instanceId == instanceId {
     if bytes.Compare(self.value, learnValue) == 0 {
@@ -85,7 +95,6 @@ func (self *CommitContext) isMyCommit(instanceId uint64, learnValue []byte)(bool
   if isMyCommit {
     ctx = self.stateMachineContext
   }
-  self.mutex.Unlock()
 
   return isMyCommit, ctx
 }
@@ -96,10 +105,10 @@ func (self *CommitContext) setResultOnlyRet(commitret error) {
 
 func (self *CommitContext) setResult(commitret error, instanceId uint64, learnValue []byte) {
   self.mutex.Lock()
+  defer self.mutex.Unlock()
 
   if self.commitEnd || self.instanceId != instanceId {
-    log.Error("set result error")
-    self.mutex.Unlock()
+    log.Error("set result error, self instance id %d,msg instance id %d", self.instanceId, instanceId)
     return
   }
 
@@ -113,21 +122,24 @@ func (self *CommitContext) setResult(commitret error, instanceId uint64, learnVa
   self.commitEnd = true
   self.value = nil
 
-  self.mutex.Unlock()
+  log.Debug("[%s]set commit result instance %d", self.instance.String(),instanceId)
 
   self.wait <- true
 }
 
 func (self *CommitContext) getResult() (uint64, error) {
-  timer := time.NewTimer(100 * time.Millisecond)
+  timer := time.NewTimer(3000 * time.Millisecond)
+  timeOut := false
+
   select {
   case <- timer.C:
+    timeOut = true
     break
   case <- self.wait:
     break
   }
 
-  if !timer.Stop() {
+  if !timeOut && !timer.Stop() {
     select {
     // otherwise should wait timer
     case <- timer.C:
@@ -136,6 +148,10 @@ func (self *CommitContext) getResult() (uint64, error) {
   }
 
   self.end = util.NowTimeMs()
+  if timeOut {
+    return 0, gpaxos.PaxosTryCommitRet_Timeout
+  }
+
   if self.commitRet == gpaxos.PaxosTryCommitRet_OK {
     return self.instanceId, self.commitRet
   }

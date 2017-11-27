@@ -18,36 +18,41 @@ func (self *BallotNumber) String() string {
   return fmt.Sprintf("%d:%d", self.proposalId, self.nodeId)
 }
 
-func (bn *BallotNumber) BE(other *BallotNumber) bool {
-  if bn.proposalId == other.proposalId {
-    return bn.nodeId >= other.nodeId
+func (self *BallotNumber) BE(other *BallotNumber) bool {
+  if self.proposalId == other.proposalId {
+    return self.nodeId >= other.nodeId
   }
 
-  return bn.proposalId >= other.proposalId
+  return self.proposalId >= other.proposalId
 }
 
-func (bn *BallotNumber) NE(other *BallotNumber) bool {
-  return bn.proposalId != other.proposalId ||
-    bn.nodeId != other.nodeId
+func (self *BallotNumber) NE(other *BallotNumber) bool {
+  return self.proposalId != other.proposalId ||
+    self.nodeId != other.nodeId
 }
 
-func (bn *BallotNumber) EQ(other *BallotNumber) bool {
-  return !bn.NE(other)
+func (self *BallotNumber) EQ(other *BallotNumber) bool {
+  return !self.NE(other)
 }
 
-func (bn *BallotNumber) BT(other *BallotNumber) bool {
-  if bn.proposalId == other.proposalId {
-    return bn.nodeId > other.nodeId
+func (self *BallotNumber) BT(other *BallotNumber) bool {
+  if self.proposalId == other.proposalId {
+    return self.nodeId > other.nodeId
   }
 
-  return bn.proposalId > other.proposalId
+  return self.proposalId > other.proposalId
 }
 
-func (bn *BallotNumber) IsNull() bool {
-  return bn.proposalId == 0
+func (self *BallotNumber) IsNull() bool {
+  return self.proposalId == 0
 }
 
-func (bn *BallotNumber) Reset() {
-  bn.nodeId = 0
-  bn.proposalId = 0
+func (self *BallotNumber) Clone(bn *BallotNumber) {
+  self.nodeId = bn.nodeId
+  self.proposalId = bn.proposalId
+}
+
+func (self *BallotNumber) Reset() {
+  self.nodeId = 0
+  self.proposalId = 0
 }

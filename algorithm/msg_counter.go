@@ -14,7 +14,7 @@ type MsgCounter struct {
   mutex sync.Mutex
 }
 
-func newMsgCounter(config *config.Config) *MsgCounter {
+func NewMsgCounter(config *config.Config) *MsgCounter {
   counter := &MsgCounter{
     config: config,
   }
@@ -28,7 +28,7 @@ func (self *MsgCounter) StartNewRound() {
   self.promiseOrAcceptMsgNodeIDMaps = make(map[uint64]bool, 0)
 }
 
-func (self *MsgCounter) addReceive(nodeId uint64) {
+func (self *MsgCounter) AddReceive(nodeId uint64) {
   self.mutex.Lock()
   self.receiveMsgNodeIDMaps[nodeId] = true
   self.mutex.Unlock()

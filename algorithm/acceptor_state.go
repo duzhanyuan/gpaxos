@@ -44,7 +44,7 @@ func (self *AcceptorState) GetPromiseNum() *BallotNumber {
 }
 
 func (self *AcceptorState) SetPromiseNum(promiseNum *BallotNumber) {
-  self.promiseNum = promiseNum
+  self.promiseNum.Clone(promiseNum)
 }
 
 func (self *AcceptorState) GetAcceptedNum() *BallotNumber {
@@ -52,7 +52,7 @@ func (self *AcceptorState) GetAcceptedNum() *BallotNumber {
 }
 
 func (self *AcceptorState) SetAcceptedNum(acceptedNum *BallotNumber) {
-  self.acceptedNum = acceptedNum
+  self.acceptedNum.Clone(acceptedNum)
 }
 
 func (self *AcceptorState) GetAcceptedValue() []byte {

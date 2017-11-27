@@ -30,30 +30,31 @@ func NewLearner(instance *Instance) *Learner {
     paxosLog:                         instance.paxosLog,
     acceptor:                         instance.acceptor,
     isImLearning:                     false,
-    highestSeenInstanceID:            0,
+    highestSeenInstanceID:            1,
     highestSeenInstanceID_fromNodeID: common.NULL_NODEID,
-    lastAckInstanceId:                0,
+    lastAckInstanceId:                1,
     state:                            NewLearnerState(instance),
     instance:                         instance,
   }
   learner.sender = NewLearnerSender(instance, learner)
 
-  learner.InitForNewPaxosInstance()
+  learner.InitForNewPaxosInstance(false)
 
   return learner
 }
 
-func (self *Learner) InitForNewPaxosInstance() {
+func (self *Learner) InitForNewPaxosInstance(isMyCommit bool) {
   self.state.Init()
+}
+
+func (self *Learner) NewInstance(isMyComit bool) {
+  self.Base.newInstance()
+  self.InitForNewPaxosInstance(isMyComit)
+  log.Debug("[%s]now learner instance id %d", self.instance.String(), self.Base.GetInstanceId())
 }
 
 func (self *Learner) Init() {
   self.sender.Start()
-}
-
-func (self *Learner) NewInstance() {
-  self.Base.newInstance()
-  self.InitForNewPaxosInstance()
 }
 
 func (self *Learner) IsLearned() bool {
@@ -92,8 +93,7 @@ func (self *Learner) Reset_AskforLearn_Noop(timeout uint32) {
     self.timerThread.DelTimer(self.askforlearnNoopTimerID)
   }
 
-  absTime := util.NowTimeMs() + uint64(timeout)
-  self.askforlearnNoopTimerID = self.timerThread.AddTimer(absTime, LearnerTimer, self)
+  self.askforlearnNoopTimerID = self.timerThread.AddTimer(timeout, LearnerTimer, self)
 }
 
 func (self *Learner) AskforLearn_Noop(isStart bool) {
