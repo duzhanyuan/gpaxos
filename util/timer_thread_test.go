@@ -33,7 +33,7 @@ func (self *TimerTester) OnTimeout(timer *Timer) {
   diff := now - self.now
   // TODO: the error is too big!!
   TestAssert(self.t,
-    diff >= uint64(self.diff) && diff <= uint64(self.diff) + 50,
+    diff >= uint64(self.diff - 5) && diff <= uint64(self.diff) + 5,
     "timer %d error, diff:%d, expected: %d, now:%d\n", self.i, diff, self.diff, self.now)
   if self.wg != nil {
     self.wg.Done()
@@ -51,7 +51,7 @@ func TestTimeerThread(t *testing.T) {
   for i:=0;i<cnt;i++ {
     now := NowTimeMs()
     timer_tester := newTimerTester(&wg, now, i,i+start,t)
-    thread.AddTimer(now + uint64(start + i), 0, timer_tester)
+    thread.AddTimer(uint32(start + i), 0, timer_tester)
   }
 
   wg.Wait()
@@ -61,7 +61,7 @@ func TestDelTimer(t *testing.T) {
   thread := NewTimerThread()
   now := NowTimeMs()
   timer_tester := newTimerTester(nil, now, 0,1000,t)
-  id := thread.AddTimer(now + 1000, 0, timer_tester)
+  id := thread.AddTimer(1000, 0, timer_tester)
 
   thread.DelTimer(id)
 
