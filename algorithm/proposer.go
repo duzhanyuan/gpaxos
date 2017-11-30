@@ -138,7 +138,7 @@ func (self *Proposer) addPrepareTimer(timeOutMs uint32) {
     self.prepareTimerId = 0
   }
 
-  self.prepareTimerId = self.timerThread.AddTimer(timeOutMs, PrepareTimer, self)
+  self.prepareTimerId = self.timerThread.AddTimer(timeOutMs, PrepareTimer, self.instance)
   log.Debug("[%s]add prepare timer %d timeout %dms", self.instance.String(), self.prepareTimerId, timeOutMs)
 }
 
@@ -148,7 +148,7 @@ func (self *Proposer) addAcceptTimer(timeOutMs uint32) {
     self.acceptTimerId = 0
   }
 
-  self.acceptTimerId = self.timerThread.AddTimer(timeOutMs, AcceptTimer, self)
+  self.acceptTimerId = self.timerThread.AddTimer(timeOutMs, AcceptTimer, self.instance)
   log.Debug("[%s]add accept timer %d timeout %dms", self.instance.String(), self.acceptTimerId, timeOutMs)
 }
 
@@ -263,17 +263,4 @@ func (self *Proposer) onPrepareTimeout() {
 
 func (self *Proposer) onAcceptTimeout() {
   self.prepare(self.wasRejectBySomeone)
-}
-
-func (self *Proposer)OnTimeout(timer *util.Timer) {
-  log.Debug("[%s]proposer timeout type:%d", self.instance.String(),timer.TimerType)
-
-  if timer.TimerType == PrepareTimer {
-    self.onPrepareTimeout()
-    return
-  }
-
-  if timer.TimerType == AcceptTimer {
-    self.onAcceptTimeout()
-  }
 }

@@ -307,6 +307,17 @@ func (self *Instance) OnReceivePaxosMsg(msg *common.PaxosMsg, isRetry bool) erro
   return common.ErrInvalidMsg
 }
 
+func (self *Instance)OnTimeout(timer *util.Timer) {
+  if timer.TimerType == PrepareTimer {
+    self.proposer.onPrepareTimeout()
+    return
+  }
+
+  if timer.TimerType == AcceptTimer {
+    self.proposer.onAcceptTimeout()
+  }
+}
+
 func (self *Instance)OnReceiveMsg(buffer []byte, cmd int32) error {
   if cmd == common.MsgCmd_PaxosMsg {
     var msg common.PaxosMsg
