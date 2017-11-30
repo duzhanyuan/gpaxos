@@ -10,6 +10,12 @@ import (
   "github.com/lichuang/gpaxos"
   "github.com/lichuang/gpaxos/util"
   "github.com/golang/protobuf/proto"
+  "container/list"
+  "time"
+)
+
+const (
+  RETRY_QUEUE_MAX_LEN = 300
 )
 
 type Instance struct {
@@ -31,6 +37,8 @@ type Instance struct {
 
   commitChan chan CommitMsg
   paxosMsgChan chan *common.PaxosMsg
+
+  retryMsgList *list.List
 }
 
 func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instance {
@@ -42,6 +50,7 @@ func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instanc
     end:         make(chan bool),
     commitChan:  make(chan CommitMsg),
     paxosMsgChan:  make(chan *common.PaxosMsg, 100),
+    retryMsgList: list.New(),
   }
   instance.initNetwork(config.GetOptions())
 
@@ -70,6 +79,7 @@ func (self *Instance) main(start chan bool) {
 
   end := false
   for !end {
+    timer := time.NewTimer(1 * time.Second)
     select {
     case <-self.end:
       end = true
@@ -80,7 +90,12 @@ func (self *Instance) main(start chan bool) {
     case msg := <- self.paxosMsgChan:
       self.OnReceivePaxosMsg(msg, false)
       break
+    case <- timer.C:
+      break
     }
+
+    timer.Stop()
+    self.dealRetryMsg()
   }
 }
 
@@ -96,6 +111,46 @@ func (self *Instance) Status(instanceId uint64) Status {
 func (self *Instance) Propose(value []byte) (uint64, error) {
   log.Debug("[%s]try to propose value %s", self.name, string(value))
   return self.committer.NewValue(value)
+}
+
+func (self *Instance) dealRetryMsg() {
+  len := self.retryMsgList.Len()
+  hasRetry := false
+  for i:=0; i < len;i++ {
+    obj := self.retryMsgList.Front()
+    msg := obj.Value.(*common.PaxosMsg)
+    msgInstanceId := msg.GetInstanceID()
+    nowInstanceId := self.GetNowInstanceId()
+
+    if msgInstanceId > nowInstanceId {
+      break
+    } else if msgInstanceId == nowInstanceId + 1 {
+      if hasRetry {
+        self.OnReceivePaxosMsg(msg, true)
+        log.Debug("[%s]retry msg i+1 instanceid %d", msgInstanceId)
+      } else {
+        break
+      }
+    } else if msgInstanceId == nowInstanceId {
+      self.OnReceivePaxosMsg(msg, false)
+      log.Debug("[%s]retry msg instanceid %d", msgInstanceId)
+      hasRetry = true
+    }
+
+    self.retryMsgList.Remove(obj)
+  }
+}
+
+func (self *Instance) addRetryMsg(msg *common.PaxosMsg) {
+  self.retryMsgList.PushBack(msg)
+}
+
+func (self *Instance) clearRetryMsg() {
+  self.retryMsgList = list.New()
+}
+
+func (self *Instance) GetNowInstanceId() uint64 {
+  return self.acceptor.GetInstanceId()
 }
 
 func (self *Instance) sendCommitMsg() {
@@ -243,17 +298,22 @@ func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) 
 
   // ignore retry msg
   if isRetry {
-    log.Info("ignore retry msg")
+    log.Debug("ignore retry msg")
     return nil
   }
 
   // ignore processed msg
   if msgInstanceId <= acceptorInstanceId {
+    log.Debug("ignore accepted msg")
     return nil
   }
 
   if msgInstanceId >= self.learner.getSeenLatestInstanceId() {
-
+    if msgInstanceId < acceptorInstanceId + RETRY_QUEUE_MAX_LEN {
+      self.addRetryMsg(msg)
+    } else {
+      self.clearRetryMsg()
+    }
   }
   return nil
 }
@@ -310,7 +370,6 @@ func (self *Instance) OnReceivePaxosMsg(msg *common.PaxosMsg, isRetry bool) erro
 func (self *Instance)OnTimeout(timer *util.Timer) {
   if timer.TimerType == PrepareTimer {
     self.proposer.onPrepareTimeout()
-    return
   }
 
   if timer.TimerType == AcceptTimer {
