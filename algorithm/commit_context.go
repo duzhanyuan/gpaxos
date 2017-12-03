@@ -50,8 +50,6 @@ func (self *CommitContext) newCommit(value []byte, context *gpaxos.StateMachineC
   self.start = util.NowTimeMs()
 
   self.mutex.Unlock()
-
-  self.instance.sendCommitMsg()
 }
 
 func (self *CommitContext) isNewCommit() bool {
@@ -68,21 +66,16 @@ func (self *CommitContext) getCommitValue() [] byte {
   return self.value
 }
 
-func (self *CommitContext) IsMyCommit(msg *common.PaxosMsg)(bool,*gpaxos.StateMachineContext) {
+func (self *CommitContext) IsMyCommit(nodeId uint64, instanceId uint64, learnValue []byte)(bool,*gpaxos.StateMachineContext) {
   self.mutex.Lock()
   defer self.mutex.Unlock()
 
-  var ctx *gpaxos.StateMachineContext
-  isMyCommit := false
-  instanceId := msg.GetInstanceID()
-  learnValue := msg.GetValue()
-  nodeId := msg.GetNodeID()
-
   if nodeId != self.instance.config.GetMyNodeId() {
-    log.Debug("[%s]msg node id %d is not mynodeid %d", self.instance.String(), nodeId, self.instance.config.GetMyNodeId())
     return false, nil
   }
-  return true, nil
+
+  var ctx *gpaxos.StateMachineContext
+  isMyCommit := false
 
   if !self.commitEnd && self.instanceId == instanceId {
     if bytes.Compare(self.value, learnValue) == 0 {

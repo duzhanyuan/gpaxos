@@ -3,6 +3,8 @@ package algorithm
 import (
   "github.com/lichuang/gpaxos/config"
   "github.com/lichuang/gpaxos"
+  "github.com/lichuang/gpaxos/statemachine"
+  "sync"
 )
 
 const (
@@ -12,18 +14,21 @@ const (
 type Committer struct {
   config    *config.Config
   commitCtx *CommitContext
-  //factory   *sm_base.StateMachineFactory
+  factory   *statemachine.StatemachineFactory
 
   instance *Instance
 
   timeoutMs   uint64
   lastLogTime uint64
+
+  mutex sync.Mutex
 }
 
 func newCommitter(instance *Instance) *Committer {
   return &Committer{
     config:instance.config,
     commitCtx: instance.commitctx,
+    factory:instance.factory,
     instance:instance,
   }
 }
@@ -51,16 +56,17 @@ func (self *Committer) newValueGetID(value []byte, context *gpaxos.StateMachineC
 }
 
 func (self *Committer) newValueGetIDNoRetry(value []byte, context *gpaxos.StateMachineContext) (uint64, error) {
-  /*
+  self.mutex.Lock()
+  defer self.mutex.Unlock()
+
   var smid int32 = 0
   if context != nil {
     smid = context.SMId
   }
-  */
 
-  packSMIDValue := value
-  //self.factory.PackPaxosValue(packSMIDValue, smid)
-  self.commitCtx.newCommit(packSMIDValue, context)
+  packValue := self.factory.PackPaxosValue(value, smid)
+  self.commitCtx.newCommit(packValue, context)
+  self.instance.sendCommitMsg()
 
   return self.commitCtx.getResult()
 }

@@ -35,8 +35,7 @@ func (self *LearnerState) GetNewChecksum() uint32 {
 }
 
 func (self *LearnerState) LearnValueWithoutWrite(instanceId uint64, value []byte, checksum uint32) {
-  self.learnedValue = util.CopyBytes(value)
-  log.Debug("learn value:%s", string(self.learnedValue))
+  self.learnedValue = value
   self.isLearned = true
   self.newChecksum = checksum
 }

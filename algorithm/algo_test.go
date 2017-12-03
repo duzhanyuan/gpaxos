@@ -11,13 +11,48 @@ import (
   "fmt"
   "github.com/lichuang/gpaxos/util"
   "sync"
+  "time"
+  "bytes"
 )
 
 const (
   LogToConsole = true
 )
-func waitn(t *testing.T, instances[]*Instance) {
 
+func ndecided(t *testing.T, instances []*Instance, seq uint64) int {
+  count := 0
+  var v []byte
+  for i := 0; i < len(instances); i++ {
+    if instances[i] != nil {
+      decided, v1 := instances[i].Status(seq)
+      if decided == Decided {
+        if count > 0 && bytes.Compare(v, v1) != 0  {
+          t.Fatalf("decided values do not match; seq=%v i=%v v=%v v1=%v",
+            seq, i, v, v1)
+        }
+        count++
+        v = v1
+      }
+    }
+  }
+  return count
+}
+
+func waitn(t *testing.T, instances []*Instance, seq uint64, wanted int) {
+  to := 10 * time.Millisecond
+  for iters := 0; iters < 30; iters++ {
+    if ndecided(t, instances, seq) >= wanted {
+      break
+    }
+    time.Sleep(to)
+    if to < time.Second {
+      to *= 2
+    }
+  }
+  nd := ndecided(t, instances, seq)
+  if nd < wanted {
+    t.Fatalf("too few decided; seq=%v ndecided=%v wanted=%v", seq, nd, wanted)
+  }
 }
 
 func Test_Basic(t *testing.T) {
@@ -25,6 +60,7 @@ func Test_Basic(t *testing.T) {
     log.NewConsoleLogger()
   }
 
+  fmt.Printf("begin test\n")
   npaxos := 3
   var ports []int = []int{11111,11112,11113}
   var nodeList []*gpaxos.Node = make([]*gpaxos.Node, 0)
@@ -83,21 +119,11 @@ func Test_Basic(t *testing.T) {
   } else {
     fmt.Printf("propose success:%d\n", ind)
   }
+  waitn(t, ins, ind, npaxos)
 
-  for i := 0; i < npaxos;i++{
-    instance := ins[i]
-    value, err := instance.paxosLog.ReadLog(ind)
-    util.TestAssert(t,
-      err == nil,
-        "instance %d db get %d err:%v", i, ind, err)
-    util.TestAssert(t,
-      string(value) == proposalValue,
-      "get value %s, expected %s", string(value), proposalValue)
-  }
-
-  // now try another propose
+  // now try to propose same value
   ind2, ret := ins[1].Propose([]byte(proposalValue))
-
+  // instance id should by the same as before, or +1
   util.TestAssert(t,
     ind2 == ind + 1,
     "expected %d, get %d, err:%v", ind + 1, ind2, ret)

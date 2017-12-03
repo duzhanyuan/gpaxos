@@ -8,6 +8,7 @@ import (
   "github.com/lichuang/gpaxos/util"
 
   log "github.com/lichuang/log4go"
+  "math/rand"
 )
 
 type Proposer struct {
@@ -113,7 +114,7 @@ func (self *Proposer) prepare(needNewBallot bool) {
   }
 
   self.msgCounter.StartNewRound()
-  self.addPrepareTimer(100)
+  self.addPrepareTimer(self.lastPrepareTimeoutMs)
 
   base.broadcastMessage(msg, BroadcastMessage_Type_RunSelf_First)
 }
@@ -140,6 +141,10 @@ func (self *Proposer) addPrepareTimer(timeOutMs uint32) {
 
   self.prepareTimerId = self.timerThread.AddTimer(timeOutMs, PrepareTimer, self.instance)
   log.Debug("[%s]add prepare timer %d timeout %dms", self.instance.String(), self.prepareTimerId, timeOutMs)
+  self.lastPrepareTimeoutMs *= 2
+  if self.lastPrepareTimeoutMs > common.GetMaxPrepareTimeoutMs() {
+    self.lastPrepareTimeoutMs = common.GetMaxPrepareTimeoutMs()
+  }
 }
 
 func (self *Proposer) addAcceptTimer(timeOutMs uint32) {
@@ -150,6 +155,10 @@ func (self *Proposer) addAcceptTimer(timeOutMs uint32) {
 
   self.acceptTimerId = self.timerThread.AddTimer(timeOutMs, AcceptTimer, self.instance)
   log.Debug("[%s]add accept timer %d timeout %dms", self.instance.String(), self.acceptTimerId, timeOutMs)
+  self.lastAcceptTimeoutMs *= 2
+  if self.lastAcceptTimeoutMs > common.GetMaxAcceptTimeoutMs() {
+    self.lastAcceptTimeoutMs = common.GetMaxAcceptTimeoutMs()
+  }
 }
 
 func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) error {
@@ -185,7 +194,7 @@ func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) error {
     self.exitPrepare()
     self.accept()
   } else if (self.msgCounter.IsRejectedOnThisRound() || self.msgCounter.IsAllReceiveOnThisRound()){
-    self.addPrepareTimer(40)
+    self.addPrepareTimer(uint32(rand.Intn(30) + 10))
   }
 
   return nil
@@ -211,7 +220,7 @@ func (self *Proposer) accept() {
 
   self.msgCounter.StartNewRound()
 
-  self.addAcceptTimer(100)
+  self.addAcceptTimer(self.lastAcceptTimeoutMs)
 
   base.broadcastMessage(msg, BroadcastMessage_Type_RunSelf_Final)
 }
@@ -250,7 +259,7 @@ func (self *Proposer) OnAcceptReply(msg *common.PaxosMsg) error {
     self.learner.ProposerSendSuccess(base.GetInstanceId(), state.GetProposalId())
     log.Info("[%s]instance %d passed", self.instance.String(), msg.GetInstanceID())
   } else {
-    self.addAcceptTimer(30)
+    self.addAcceptTimer(uint32(rand.Intn(30) + 10))
   }
 
   log.Info("OnAcceptReply END")

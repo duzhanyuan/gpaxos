@@ -12,6 +12,7 @@ import (
   "github.com/golang/protobuf/proto"
   "container/list"
   "time"
+  "github.com/lichuang/gpaxos/statemachine"
 )
 
 const (
@@ -28,6 +29,7 @@ type Instance struct {
   learner *Learner
   acceptor *Acceptor
   name string
+  factory *statemachine.StatemachineFactory
 
   transport network.Transport
 
@@ -43,13 +45,14 @@ type Instance struct {
 
 func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instance {
   instance := &Instance{
-    config:      config,
-    logStorage:  logStorage,
-    paxosLog:    storage.NewPaxosLog(logStorage),
-    timerThread: util.NewTimerThread(),
-    end:         make(chan bool),
-    commitChan:  make(chan CommitMsg),
-    paxosMsgChan:  make(chan *common.PaxosMsg, 100),
+    config:       config,
+    logStorage:   logStorage,
+    paxosLog:     storage.NewPaxosLog(logStorage),
+    factory:      statemachine.NewStatemachineFactory(),
+    timerThread:  util.NewTimerThread(),
+    end:          make(chan bool),
+    commitChan:   make(chan CommitMsg),
+    paxosMsgChan: make(chan *common.PaxosMsg, 100),
     retryMsgList: list.New(),
   }
   instance.initNetwork(config.GetOptions())
@@ -74,12 +77,13 @@ func (self *Instance)initNetwork(options *gpaxos.Options) *Instance {
   return self
 }
 
+// instance main loop
 func (self *Instance) main(start chan bool) {
   start <- true
 
   end := false
   for !end {
-    timer := time.NewTimer(1 * time.Second)
+    timer := time.NewTimer(100 * time.Millisecond)
     select {
     case <-self.end:
       end = true
@@ -99,12 +103,13 @@ func (self *Instance) main(start chan bool) {
   }
 }
 
-func (self *Instance) Status(instanceId uint64) Status {
-  if instanceId <= self.acceptor.GetInstanceId() {
-    return Decided
+func (self *Instance) Status(instanceId uint64) (Status,[]byte) {
+  if instanceId < self.acceptor.GetInstanceId() {
+    value,_,_ := self.GetInstanceValue(instanceId)
+    return Decided, value
   }
 
-  return Pending
+  return Pending, nil
 }
 
 // try to propose a value, return instanceid end error
@@ -142,6 +147,10 @@ func (self *Instance) dealRetryMsg() {
 }
 
 func (self *Instance) addRetryMsg(msg *common.PaxosMsg) {
+  if self.retryMsgList.Len() > RETRY_QUEUE_MAX_LEN {
+    obj := self.retryMsgList.Front()
+    self.retryMsgList.Remove(obj)
+  }
   self.retryMsgList.PushBack(msg)
 }
 
@@ -195,6 +204,20 @@ func (self *Instance) GetLastChecksum() uint32 {
   return 0
 }
 
+func (self *Instance) GetInstanceValue(instanceId uint64) ([]byte, int32, error) {
+  if instanceId >= self.acceptor.GetInstanceId() {
+    return nil, -1, gpaxos.Paxos_GetInstanceValue_Value_Not_Chosen_Yet
+  }
+
+  state, err := self.paxosLog.ReadState(instanceId)
+  if err != nil {
+    return nil, -1, err
+  }
+
+  value, smid := self.factory.UnpackPaxosValue(state.GetAcceptedValue())
+  return value, smid, nil
+}
+
 func (self *Instance) isCheckSumValid(msg *common.PaxosMsg) bool {
   return true
 }
@@ -215,10 +238,10 @@ func (self *Instance) receiveMsgForLearner(msg *common.PaxosMsg) error {
   }
   if learner.IsLearned() {
     commitCtx := self.commitctx
-    isMyCommit,_ := commitCtx.IsMyCommit(msg)
+    isMyCommit,_ := commitCtx.IsMyCommit(msg.GetNodeID(), learner.GetInstanceId(), learner.GetLearnValue())
     if isMyCommit {
       log.Debug("[%s]instance %d is my commit", self.name, learner.GetInstanceId())
-      // this paxos instance end
+      // only my commit setresult
       commitCtx.setResult(gpaxos.PaxosTryCommitRet_OK, learner.GetInstanceId(), learner.GetLearnValue())
     } else {
       log.Debug("[%s]instance %d is not my commit", self.name, learner.GetInstanceId())
@@ -269,7 +292,7 @@ func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) 
   acceptorInstanceId := self.acceptor.GetInstanceId()
 
   log.Info("[%s]msg instance %d, acceptor instance %d", self.name, msgInstanceId, acceptorInstanceId)
-  // msgInstanceId == acceptorInstanceId + 1  means this instance has been approved
+  // msgInstanceId == acceptorInstanceId + 1  means acceptor instance has been approved
   // so just learn it
   if msgInstanceId == acceptorInstanceId + 1 {
     newMsg := &common.PaxosMsg{ }
@@ -302,18 +325,28 @@ func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) 
     return nil
   }
 
-  // ignore processed msg
+  // ignore expired msg
   if msgInstanceId <= acceptorInstanceId {
-    log.Debug("ignore accepted msg")
+    log.Debug("ignore expired msg")
     return nil
   }
 
-  if msgInstanceId >= self.learner.getSeenLatestInstanceId() {
-    if msgInstanceId < acceptorInstanceId + RETRY_QUEUE_MAX_LEN {
-      self.addRetryMsg(msg)
-    } else {
-      self.clearRetryMsg()
-    }
+  if msgInstanceId < self.learner.getSeenLatestInstanceId() {
+    log.Debug("ignore has learned msg")
+    return nil
+  }
+
+  if msgInstanceId < acceptorInstanceId + RETRY_QUEUE_MAX_LEN {
+    //need retry msg precondition
+    //  1. prepare or accept msg
+    //  2. msg.instanceid > nowinstanceid.
+    //    (if < nowinstanceid, this msg is expire)
+    //  3. msg.instanceid >= seen latestinstanceid.
+    //    (if < seen latestinstanceid, proposer don't need reply with this instanceid anymore.)
+    //  4. msg.instanceid close to nowinstanceid.
+    self.addRetryMsg(msg)
+  } else {
+    self.clearRetryMsg()
   }
   return nil
 }
