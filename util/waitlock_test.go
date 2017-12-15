@@ -40,7 +40,7 @@ func TestWaitlock(t *testing.T) {
 	}()
 
 	go func() {
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 		_, err := wl.Lock(3000)
 		TestAssert(t,
 			err == nil,
@@ -50,4 +50,39 @@ func TestWaitlock(t *testing.T) {
 
 	waitGroup.Wait()
 	fmt.Printf("passed ....\n")
+}
+
+func TestManyWaitlock(t *testing.T) {
+	runtime.GOMAXPROCS(4)
+
+	wl := NewWaitlock()
+
+	n := 10
+	fmt.Printf("begin test TestManyWaitlock....\n")
+	var waitGroup sync.WaitGroup
+
+	waitGroup.Add(n)
+
+	go func() {
+		_, err :=wl.Lock(1000)
+		TestAssert(t,
+			err == nil,
+			"wait lock should success")
+		time.Sleep(1 * time.Second)
+		wl.Unlock()
+	}()
+
+	for n > 0 {
+		n--
+		go func() {
+			_, err :=wl.Lock(2000)
+			TestAssert(t,
+				err == nil,
+				"wait lock should success")
+			wl.Unlock()
+			waitGroup.Done()
+		}()
+	}
+
+	waitGroup.Wait()
 }

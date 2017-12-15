@@ -4,21 +4,22 @@ import (
 	"time"
 	"sync"
 	"errors"
-	"container/list"
 )
 
 var Waitlock_Timeout = errors.New("waitlock timeout")
 
 type Waitlock struct {
-	waitChanList *list.List
 	mutex sync.Mutex
 	inUse bool
+	waitChan chan bool
+	waitCount int32
 }
 
 func NewWaitlock() *Waitlock {
 	return &Waitlock{
-		waitChanList:list.New(),
 		inUse:false,
+		waitChan: make(chan bool, 1),
+		waitCount:0,
 	}
 }
 
@@ -27,14 +28,13 @@ func (self *Waitlock) Lock(waitMs int) (int, error) {
 
 	now := NowTimeMs()
 	getLock := false
-	waitChan := make(chan bool, 1)
 
 	self.mutex.Lock()
-	if !self.inUse && self.waitChanList.Len() == 0 {
+	if !self.inUse {
 		self.inUse = true
 		getLock = true
 	} else {
-		self.waitChanList.PushBack(waitChan)
+		self.waitCount += 1
 	}
 	self.mutex.Unlock()
 
@@ -48,7 +48,7 @@ func (self *Waitlock) Lock(waitMs int) (int, error) {
 	case <- timer.C:
 		timeOut = true
 		break
-	case <- waitChan:
+	case <- self.waitChan:
 		break
 	}
 
@@ -63,14 +63,11 @@ func (self *Waitlock) Lock(waitMs int) (int, error) {
 func (self *Waitlock) Unlock() {
 	self.mutex.Lock()
 
-	if self.waitChanList.Len() > 0 {
-		obj := self.waitChanList.Front()
-		self.waitChanList.Remove(obj)
-		self.inUse = false
-		self.mutex.Unlock()
-		waitChan := obj.Value.(chan bool)
-		waitChan <- true
-	} else {
-		self.mutex.Unlock()
+	self.inUse = false
+	if self.waitCount > 0 {
+		self.waitCount -= 1
+		self.waitChan <- true
 	}
+
+	self.mutex.Unlock()
 }
