@@ -9,14 +9,14 @@ import (
   "github.com/lichuang/gpaxos"
   "os"
   "fmt"
-  "github.com/lichuang/gpaxos/util"
-  "sync"
   "time"
   "bytes"
+  "runtime"
+	"sync"
 )
 
 const (
-  LogToConsole = true
+  LogToConsole = false
 )
 
 func ndecided(t *testing.T, instances []*Instance, seq uint64) int {
@@ -55,12 +55,17 @@ func waitn(t *testing.T, instances []*Instance, seq uint64, wanted int) {
   }
 }
 
+func waitmajority(t *testing.T, instances []*Instance, seq uint64) {
+  waitn(t, instances, seq, (len(instances)/2)+1)
+}
+
 func Test_Basic(t *testing.T) {
+  runtime.GOMAXPROCS(4)
+  
   if LogToConsole {
     log.NewConsoleLogger()
   }
 
-  fmt.Printf("begin test\n")
   npaxos := 3
   var ports []int = []int{11111,11112,11113}
   var nodeList []*gpaxos.Node = make([]*gpaxos.Node, 0)
@@ -101,17 +106,8 @@ func Test_Basic(t *testing.T) {
     ins = append(ins, in)
   }
 
-  //ins[0].proposer.addPrepareTimer(100)
-  /*
-  {
-    var waitGroup sync.WaitGroup
-    waitGroup.Add(1)
-    waitGroup.Wait()
-  }
-
-  return
-  */
-
+  fmt.Printf("Test: Single proposer ...\n")
+  
   var proposalValue = "test1"
   ind, ret := ins[0].Propose([]byte(proposalValue))
   if ret != gpaxos.PaxosTryCommitRet_OK{
@@ -120,35 +116,180 @@ func Test_Basic(t *testing.T) {
     fmt.Printf("propose success:%d\n", ind)
   }
   waitn(t, ins, ind, npaxos)
+  
+  fmt.Printf("  ... Passed\n")
+  
+  fmt.Printf("Test: Many proposers, same value ...\n")
+  
+  for i := 0; i < npaxos; i++ {
+    ins[i].Propose([]byte("77"))
+  }
+  waitn(t, ins, 2, npaxos)
+  
+  fmt.Printf("  ... Passed\n")
+  
+  fmt.Printf("Test: Many proposers, different values ...\n")
+  
+  ins[0].Propose([]byte("100"))
+  ins[1].Propose([]byte("101"))
+  ins[2].Propose([]byte("102"))
+  waitn(t, ins, 5, npaxos)
+  
+  fmt.Printf("  ... Passed\n")
+  
+  fmt.Printf("now instanceid %d\n", ins[0].NowInstanceId())
+}
 
-  // now try to propose same value
-  ind2, ret := ins[1].Propose([]byte(proposalValue))
-  // instance id should by the same as before, or +1
-  util.TestAssert(t,
-    ind2 == ind + 1,
-    "expected %d, get %d, err:%v", ind + 1, ind2, ret)
+func TestDeaf(t *testing.T) {
+  runtime.GOMAXPROCS(4)
 
-    return
-
-  // try concurrent propose
-  proposeValues := make([]string, 0)
-  var waitGroup sync.WaitGroup
-  npaxos = 1
-  waitGroup.Add(npaxos)
-  for i := 0; i < npaxos;i++ {
-    instance := ins[i]
-    v := fmt.Sprintf("propose_value_%d", i)
-    proposeValues = append(proposeValues, v)
-
-    go func() {
-      id, err := instance.Propose([]byte(v))
-      util.TestAssert(t,
-        err == gpaxos.PaxosTryCommitRet_OK,
-        "instance %d db get %d err:%v", i, id, err)
-      fmt.Printf("[%d]id: %d", i, id)
-      waitGroup.Done()
-    }()
+  if LogToConsole {
+    log.NewConsoleLogger()
   }
 
-  waitGroup.Wait()
+  npaxos := 5
+  var ports []int = []int{11111,11112,11113,11114,11115}
+  var nodeList []*gpaxos.Node = make([]*gpaxos.Node, 0)
+  var tmpDirs[]string = make([]string, 0)
+  var ins[]*Instance = make([]*Instance, 0)
+  var dbs[]storage.LogStorage = make([] storage.LogStorage, 0)
+
+  defer func() {
+    for i:= 0; i < npaxos;i++ {
+      os.RemoveAll(tmpDirs[i])
+    }
+  }()
+
+  for i := 0; i < npaxos;i++{
+    node := gpaxos.NewNode("127.0.0.1", ports[i])
+    nodeList = append(nodeList, node)
+  }
+
+  for i:= 0; i < npaxos;i++ {
+    name := fmt.Sprintf("gpaxos_%d", ports[i])
+    tmp, _ := ioutil.TempDir("/tmp", name)
+    tmpDirs = append(tmpDirs, tmp)
+  }
+  for i := 0; i < npaxos;i++{
+    node := nodeList[i]
+
+    options := &gpaxos.Options{
+      MyNode: node,
+      NodeList: nodeList,
+    }
+
+    db := storage.LogStorage{}
+    db.Init(tmpDirs[i])
+    dbs = append(dbs, db)
+
+    config := config.NewConfig(options)
+    in := NewInstance(config, &db)
+    ins = append(ins, in)
+  }
+
+  fmt.Printf("Test: Deaf proposer ...\n")
+
+  ind, _ := ins[0].Propose([]byte("hello"))
+  waitn(t, ins, ind, npaxos)
+
+  fmt.Printf("now stop 2 instance...\n")
+  ins[0].Stop()
+  ins[npaxos - 1].Stop()
+
+  ind, _ = ins[1].Propose([]byte("goodbye"))
+  waitmajority(t, ins, ind)
+  time.Sleep(1 * time.Second)
+  if ndecided(t, ins, ind) != npaxos - 2 {
+    t.Fatalf("a deaf peer heard about a decision")
+  }
+
+  fmt.Printf("  ... Passed...........\n")
+}
+
+func TestMany(t *testing.T) {
+  runtime.GOMAXPROCS(4)
+
+  if LogToConsole {
+    log.NewConsoleLogger()
+  }
+
+  npaxos := 5
+  var ports []int = []int{11111,11112,11113,11114,11115}
+  var nodeList []*gpaxos.Node = make([]*gpaxos.Node, 0)
+  var tmpDirs[]string = make([]string, 0)
+  var ins[]*Instance = make([]*Instance, 0)
+  var dbs[]storage.LogStorage = make([] storage.LogStorage, 0)
+
+  defer func() {
+    for i:= 0; i < npaxos;i++ {
+      os.RemoveAll(tmpDirs[i])
+    }
+  }()
+
+  for i := 0; i < npaxos;i++{
+    node := gpaxos.NewNode("127.0.0.1", ports[i])
+    nodeList = append(nodeList, node)
+  }
+
+  for i:= 0; i < npaxos;i++ {
+    name := fmt.Sprintf("gpaxos_%d", ports[i])
+    tmp, _ := ioutil.TempDir("/tmp", name)
+    tmpDirs = append(tmpDirs, tmp)
+  }
+  for i := 0; i < npaxos;i++{
+    node := nodeList[i]
+
+    options := &gpaxos.Options{
+      MyNode: node,
+      NodeList: nodeList,
+    }
+
+    db := storage.LogStorage{}
+    db.Init(tmpDirs[i])
+    dbs = append(dbs, db)
+
+    config := config.NewConfig(options)
+    in := NewInstance(config, &db)
+    ins = append(ins, in)
+  }
+
+  fmt.Printf("Test: Many proposer ...\n")
+
+  var mutex sync.Mutex
+  var instanceMap map[uint64]bool = make(map[uint64]bool)
+
+  num := npaxos * 3
+
+  var waitGroup sync.WaitGroup
+  waitGroup.Add(num)
+
+	for i := 0; i < num;i++ {
+		go func(index int) {
+			defer waitGroup.Done()
+			mutex.Lock()
+			defer mutex.Unlock()
+			i := index % npaxos
+			value := fmt.Sprintf("instance_%d", i + 1)
+			ind, err := ins[i].Propose([]byte(value))
+			fmt.Printf("[%d]instance %d, ind: %d, err:%v\n", index, i + 1, ind, err)
+			if err == gpaxos.PaxosTryCommitRet_OK {
+				_, ok := instanceMap[ind]
+				if ok {
+					t.Fatalf("duplicate instance id")
+				}
+				if ind > 1 {
+					_, ok := instanceMap[ind - 1]
+					if !ok {
+						t.Fatalf("instance id hole")
+					}
+				}
+
+				instanceMap[ind] = true
+			}
+		}(i)
+	}
+
+	waitGroup.Wait()
+
+  fmt.Printf("  ... Passed...........\n")
 }

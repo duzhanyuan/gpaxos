@@ -52,6 +52,12 @@ func (self *MsgCounter) IsPassedOnThisRound() bool {
   return len(self.promiseOrAcceptMsgNodeIDMaps) >= self.config.GetMajorityCount()
 }
 
+func (self *MsgCounter) GetPassedCount() int {
+  self.mutex.Lock()
+  defer self.mutex.Unlock()
+  return len(self.promiseOrAcceptMsgNodeIDMaps)
+}
+
 func (self *MsgCounter) IsRejectedOnThisRound() bool {
   self.mutex.Lock()
   defer self.mutex.Unlock()

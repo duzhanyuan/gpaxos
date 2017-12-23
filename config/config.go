@@ -4,6 +4,7 @@ import (
   "github.com/lichuang/gpaxos/common"
   "github.com/lichuang/gpaxos/util"
   "github.com/lichuang/gpaxos"
+  "math"
 )
 
 type Config struct {
@@ -20,7 +21,7 @@ type Config struct {
 func NewConfig(options *gpaxos.Options) *Config{
   return &Config{
     options:options,
-    majorCnt:(len(options.NodeList) / 2) + 1,
+    majorCnt:(int(math.Floor(float64(len(options.NodeList)) / 2)) + 1),
   }
 }
 

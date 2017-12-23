@@ -4,6 +4,7 @@ import "net"
 
 type Session interface {
   Handle()
+  Stop()
 }
 
 type SessionFactory interface {
@@ -11,6 +12,7 @@ type SessionFactory interface {
 }
 
 type Transport interface {
+  Close()
   SendMessage(sendNodeId uint64, msg []byte) error
   BroadcastMessage(msg []byte) error
 }

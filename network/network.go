@@ -28,7 +28,7 @@ func NewNetwork(options *gpaxos.Options, factory SessionFactory) *Network {
       continue
     }
 
-    connections[node.Id] = NewConnection(addr)
+    connections[node.Id] = NewConnection(addr, node.Id)
   }
 
   return &Network{
@@ -45,14 +45,18 @@ func (self *Network) SendMessage(nodeid uint64, msg []byte) error {
     return common.ErrNodeNotFound
   }
 
-  conn.Send(msg)
+  go conn.Send(msg)
   return nil
 }
 
 func (self *Network) BroadcastMessage(msg []byte) error {
   for _, conn := range self.connections {
-    conn.Send(msg)
+    go conn.Send(msg)
   }
 
   return nil
+}
+
+func (self *Network) Close() {
+  self.listener.Stop()
 }

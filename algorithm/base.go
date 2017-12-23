@@ -36,11 +36,17 @@ func init() {
 }
 
 func newBase(instance *Instance) Base {
+  var instanceId uint64 = 1
+  maxInstanceId, err := instance.logStorage.GetMaxInstanceID()
+  if err == nil {
+    instanceId = maxInstanceId + 1
+  }
+
   return Base{
     config:instance.config,
     transport:instance.transport,
     instance:instance,
-    instanceId:1,
+    instanceId:instanceId,
     isTestNode:false,
   }
 }
@@ -126,7 +132,7 @@ func (self *Base) sendCheckpointMessage(sendToNodeid uint64, msg *common.Checkpo
 
 func (self *Base) sendPaxosMessage(sendToNodeid uint64, msg *common.PaxosMsg) error {
   if sendToNodeid == self.config.GetMyNodeId() {
-    log.Error("no need send to self")
+    self.instance.OnReceivePaxosMsg(msg, false)
     return nil
   }
 
@@ -196,9 +202,6 @@ func unpackBaseMsg(buffer []byte, header *common.Header) (body []byte, err error
   var bufferLen = int32(len(buffer))
 
   bodyStartPos := bufferLen - header.GetBodylen()
-
-  log.Debug("buffer size %d, cmd %d "+ "version %d, body startpos %d",
-    bufferLen, header.GetCmdid(), header.GetVersion(), bodyStartPos)
 
   if bodyStartPos+int32(CHECKSUM_LEN) > bufferLen {
     log.Error("no checksum, body start pos %d, buffersize %d", bodyStartPos, bufferLen)

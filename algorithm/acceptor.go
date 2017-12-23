@@ -93,6 +93,7 @@ func (self *Acceptor) onPrepare(msg *common.PaxosMsg) error {
 
     if state.GetAcceptedNum().proposalId > 0 {
       reply.Value = util.CopyBytes(state.GetAcceptedValue())
+      log.Debug("[%s]return preaccept value:%s", self.instance.String(), string(reply.Value))
     }
 
     state.SetPromiseNum(ballot)

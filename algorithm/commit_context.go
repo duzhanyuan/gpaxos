@@ -58,6 +58,7 @@ func (self *CommitContext) isNewCommit() bool {
 
 func (self *CommitContext) StartCommit(instanceId uint64) {
   self.mutex.Lock()
+  log.Debug("[%s]start commit %d", self.instance.String(), instanceId)
   self.instanceId = instanceId
   self.mutex.Unlock()
 }
@@ -71,6 +72,7 @@ func (self *CommitContext) IsMyCommit(nodeId uint64, instanceId uint64, learnVal
   defer self.mutex.Unlock()
 
   if nodeId != self.instance.config.GetMyNodeId() {
+  	log.Debug("[%s]%d not my instance id", self.instance.String(), nodeId)
     return false, nil
   }
 
@@ -81,13 +83,16 @@ func (self *CommitContext) IsMyCommit(nodeId uint64, instanceId uint64, learnVal
     if bytes.Compare(self.value, learnValue) == 0 {
       isMyCommit = true
     } else {
+			log.Debug("[%s]%d not my value", self.instance.String(), instanceId)
       isMyCommit = false
     }
-  }
+	}
 
   if isMyCommit {
     ctx = self.stateMachineContext
-  }
+  } else {
+  	log.Debug("[%s]%d not my commit %v", self.instance.String(), instanceId, self.commitEnd)
+	}
 
   return isMyCommit, ctx
 }
@@ -101,7 +106,7 @@ func (self *CommitContext) setResult(commitret error, instanceId uint64, learnVa
   defer self.mutex.Unlock()
 
   if self.commitEnd || self.instanceId != instanceId {
-    log.Error("set result error, self instance id %d,msg instance id %d", self.instanceId, instanceId)
+    log.Error("[%s]set result error, self instance id %d,msg instance id %d", self.instance.String(), self.instanceId, instanceId)
     return
   }
 

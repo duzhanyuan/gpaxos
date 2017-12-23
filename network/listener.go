@@ -3,18 +3,30 @@ package network
 import (
   "net"
   log "github.com/lichuang/log4go"
+  "time"
+)
+
+const (
+  MaxWaitIOTime = time.Millisecond * 100
 )
 
 type Listener struct {
+  *net.TCPListener
+
   addr string
   factory SessionFactory
-  listener net.Listener
+  stopChan chan bool
+  end bool
+  sessionMap map[string]Session
 }
 
 func NewListener(addr string, factory SessionFactory) *Listener {
   return &Listener{
     addr:addr,
     factory:factory,
+    stopChan:make(chan bool),
+    end:false,
+    sessionMap:make(map[string]Session),
   }
 }
 
@@ -24,19 +36,55 @@ func (self *Listener) Run() {
     log.Error("listen error: %v", err)
     return
   }
-  self.listener = listener
+  tcplistener, ok := listener.(*net.TCPListener)
+  if !ok {
+    log.Error("wrap tcp listener error")
+    return
+  }
+  self.TCPListener = tcplistener
   go self.main()
 }
 
 func (self *Listener) main() {
+
   for {
-    conn, err := self.listener.Accept()
-    if err != nil {
-      continue
+    self.SetDeadline(time.Now().Add(MaxWaitIOTime))
+
+    conn, err := self.TCPListener.Accept()
+
+    select {
+    case <- self.stopChan:
+      if err == nil {
+        conn.Close()
+      }
+      return
+    default:
+      break
     }
 
+    if err != nil {
+      netErr, ok := err.(net.Error)
+
+      if ok && netErr.Timeout() && netErr.Temporary() {
+        continue
+      }
+    }
+
+    if self.end {
+      return
+    }
     session := self.factory.Create(conn)
+    self.sessionMap[conn.RemoteAddr().String()] = session
     go session.Handle()
   }
 }
 
+func (self *Listener) Stop() {
+  self.end = true
+  close(self.stopChan)
+  self.TCPListener.Close()
+
+  for _, session := range self.sessionMap {
+    session.Stop()
+  }
+}

@@ -36,7 +36,6 @@ func (self *PaxosSessionFactory) Create(conn net.Conn) network.Session {
 const (
   ACCEPTING_HEADER = iota
   ACCEPTING_BODY
-
 )
 
 type PaxosSession struct {
@@ -135,6 +134,9 @@ func (self *PaxosSession) recvBody() error {
 
   self.state = ACCEPTING_HEADER
   return nil
+}
+
+func (self *PaxosSession) Stop() {
 }
 
 func (self *PaxosSession) Handle() {

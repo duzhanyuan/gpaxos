@@ -89,7 +89,6 @@ func (self *Proposer) prepare(needNewBallot bool) {
   base := self.Base
   state := self.state
 
-  self.instance.commitctx.StartCommit(self.GetInstanceId())
 
   // first reset all state
   self.exitAccept()
@@ -102,7 +101,7 @@ func (self *Proposer) prepare(needNewBallot bool) {
     self.state.newPrepare()
   }
 
-  log.Info("[%s]start now.instanceid %d mynodeid %d state.proposal id %d state.valuelen %d new %v",
+  log.Info("[%s]start prepare now.instanceid %d mynodeid %d state.proposal id %d state.valuelen %d new %v",
     self.instance.String(),self.GetInstanceId(), self.config.GetMyNodeId(), state.GetProposalId(), len(state.GetValue()), needNewBallot)
 
   // pack paxos prepare msg and broadcast
@@ -162,7 +161,7 @@ func (self *Proposer) addAcceptTimer(timeOutMs uint32) {
 }
 
 func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) error {
-  log.Info("[%s]OnPrepareReply", self.instance.String())
+  log.Info("[%s]OnPrepareReply from %d", self.instance.String(), msg.GetNodeID())
 
   if self.state.state != PREPARE {
     log.Error("[%s]proposer state not PREPARE", self.instance.String())
@@ -189,6 +188,7 @@ func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) error {
     log.Debug("[%s]prepare rejected", self.instance.String())
   }
 
+  log.Debug("[%s]%d prepare pass count:%d, major count:%d", self.instance.String(), self.GetInstanceId(),self.msgCounter.GetPassedCount(), self.config.GetMajorityCount())
   if self.msgCounter.IsPassedOnThisRound() {
     self.canSkipPrepare = true
     self.exitPrepare()
@@ -201,20 +201,20 @@ func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) error {
 }
 
 func (self *Proposer) accept() {
-  log.Info("[%s]start accept", self.instance.String())
+	base := self.Base
+	state := self.state
+
+  log.Info("[%s]start accept %s", self.instance.String(), string(state.GetValue()))
 
   self.exitAccept()
   self.state.setState(ACCEPT)
-
-  base := self.Base
-  state := self.state
 
   msg := &common.PaxosMsg{
     MsgType:    proto.Int32(common.MsgType_PaxosAccept),
     InstanceID: proto.Uint64(base.GetInstanceId()),
     NodeID:     proto.Uint64(self.config.GetMyNodeId()),
     ProposalID: proto.Uint64(state.GetProposalId()),
-    Value:state.GetValue(),
+    Value:			state.GetValue(),
     LastChecksum:proto.Uint32(base.GetLastChecksum()),
   }
 

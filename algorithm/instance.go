@@ -13,6 +13,8 @@ import (
   "container/list"
   "time"
   "github.com/lichuang/gpaxos/statemachine"
+  "sync"
+  "fmt"
 )
 
 const (
@@ -35,12 +37,15 @@ type Instance struct {
 
   timerThread *util.TimerThread
 
-  end chan bool
+  endChan chan bool
+  end bool
 
   commitChan chan CommitMsg
   paxosMsgChan chan *common.PaxosMsg
 
   retryMsgList *list.List
+  
+  mutex sync.Mutex
 }
 
 func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instance {
@@ -50,8 +55,8 @@ func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instanc
     paxosLog:     storage.NewPaxosLog(logStorage),
     factory:      statemachine.NewStatemachineFactory(),
     timerThread:  util.NewTimerThread(),
-    end:          make(chan bool),
-    commitChan:   make(chan CommitMsg),
+    endChan:      make(chan bool),
+    commitChan:   make(chan CommitMsg, 1),
     paxosMsgChan: make(chan *common.PaxosMsg, 100),
     retryMsgList: list.New(),
   }
@@ -64,7 +69,11 @@ func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instanc
   instance.learner = NewLearner(instance)
   instance.proposer = NewProposer(instance)
 
-  instance.name = config.GetOptions().MyNode.String()
+  instance.name = fmt.Sprintf("%s-%d", config.GetOptions().MyNode.String(), config.GetMyNodeId())
+
+  maxInstanceId, err := logStorage.GetMaxInstanceID()
+  log.Debug("max instance id:%d:%v， propose id:%d", maxInstanceId, err, instance.proposer.GetInstanceId())
+
   start := make(chan bool)
   go instance.main(start)
   <- start
@@ -85,7 +94,7 @@ func (self *Instance) main(start chan bool) {
   for !end {
     timer := time.NewTimer(100 * time.Millisecond)
     select {
-    case <-self.end:
+    case <-self.endChan:
       end = true
       break
     case <-self.commitChan:
@@ -103,6 +112,17 @@ func (self *Instance) main(start chan bool) {
   }
 }
 
+func (self *Instance) Stop() {
+  self.end = true
+  self.endChan <- true
+  
+  self.transport.Close()
+  close(self.paxosMsgChan)
+  close(self.commitChan)
+  close(self.endChan)
+  self.timerThread.Stop()
+}
+
 func (self *Instance) Status(instanceId uint64) (Status,[]byte) {
   if instanceId < self.acceptor.GetInstanceId() {
     value,_,_ := self.GetInstanceValue(instanceId)
@@ -110,6 +130,13 @@ func (self *Instance) Status(instanceId uint64) (Status,[]byte) {
   }
 
   return Pending, nil
+}
+
+func (self *Instance) NowInstanceId()uint64 {
+  self.mutex.Lock()
+  defer self.mutex.Unlock()
+  
+  return self.acceptor.GetInstanceId() - 1
 }
 
 // try to propose a value, return instanceid end error
@@ -164,12 +191,10 @@ func (self *Instance) GetNowInstanceId() uint64 {
 
 func (self *Instance) sendCommitMsg() {
   self.commitChan <- CommitMsg{}
-  log.Debug("send commit msg")
 }
 
 // handle commit message
 func (self *Instance) onCommit() {
-  log.Debug("[%s]on commit", self.name)
   if !self.commitctx.isNewCommit() {
     return
   }
@@ -190,6 +215,7 @@ func (self *Instance) onCommit() {
     self.commitctx.setResultOnlyRet(gpaxos.PaxosTryCommitRet_Value_Size_TooLarge)
   }
 
+	self.commitctx.StartCommit(self.proposer.GetInstanceId())
   // ok, now do commit
   //self.commitctx.StartCommit(self.proposer.GetInstanceId())
 
@@ -242,11 +268,11 @@ func (self *Instance) receiveMsgForLearner(msg *common.PaxosMsg) error {
     if isMyCommit {
       log.Debug("[%s]instance %d is my commit", self.name, learner.GetInstanceId())
       // only my commit setresult
-      commitCtx.setResult(gpaxos.PaxosTryCommitRet_OK, learner.GetInstanceId(), learner.GetLearnValue())
     } else {
       log.Debug("[%s]instance %d is not my commit", self.name, learner.GetInstanceId())
     }
 
+		commitCtx.setResult(gpaxos.PaxosTryCommitRet_OK, learner.GetInstanceId(), learner.GetLearnValue())
     self.NewInstance(isMyCommit)
 
     log.Info("[%s]new paxos instance has started, Now instance id:proposer %d, acceptor %d, learner %d",
@@ -256,7 +282,6 @@ func (self *Instance) receiveMsgForLearner(msg *common.PaxosMsg) error {
 }
 
 func (self *Instance) receiveMsgForProposer(msg *common.PaxosMsg) error {
-  log.Debug("[%s]receive proposer msg %d",self.name,msg.GetMsgType())
   if self.config.IsIMFollower() {
     log.Error("[%s]follower skip %d msg", self.name, msg.GetMsgType())
     return nil
@@ -327,7 +352,7 @@ func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) 
 
   // ignore expired msg
   if msgInstanceId <= acceptorInstanceId {
-    log.Debug("ignore expired msg")
+    log.Debug("[%s]ignore expired msg from %d", self.name, msg.GetNodeID())
     return nil
   }
 
@@ -411,10 +436,14 @@ func (self *Instance)OnTimeout(timer *util.Timer) {
 }
 
 func (self *Instance)OnReceiveMsg(buffer []byte, cmd int32) error {
+  if self.end {
+    return nil
+  }
   if cmd == common.MsgCmd_PaxosMsg {
     var msg common.PaxosMsg
     err := proto.Unmarshal(buffer, &msg)
     if err != nil {
+      log.Error("[%s]unmarshal msg error %v", self.name, err)
       return err
     }
     self.paxosMsgChan <- &msg

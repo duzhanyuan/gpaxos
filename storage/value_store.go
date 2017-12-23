@@ -401,9 +401,10 @@ func (self *ValueStore) Read(fileIdstr string, instanceId *uint64) ([]byte, erro
 
   util.DecodeUint64(tmpbuf, 0, instanceId)
 
-
+  /*
   log.Info("ok, fileid %d offset %d instanceid %d buffser size %d",
     fileId, offset, *instanceId, int(bufferlen)-util.UINT64SIZE)
+  */
 
   return tmpbuf[util.UINT64SIZE:], nil
 }

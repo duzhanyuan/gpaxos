@@ -27,11 +27,28 @@ func NewTestSession(conn net.Conn) *TestSession {
   }
 }
 
+func (self *TestSession)Stop() {
+
+}
+
 func (self *TestSession)Handle() {
   conn := self.conn
   remoteAddr := conn.RemoteAddr().String()
   fmt.Printf("accept connection from %s", remoteAddr)
 
+  var tmp []byte
+  for {
+    select {
+    case t, err := conn.Read(tmp):
+      if t > 1{
+
+      }
+      if err != nil {
+
+      }
+      break
+    }
+  }
   for {
     line, err := bufio.NewReader(conn).ReadBytes('\n')
     if err != nil {

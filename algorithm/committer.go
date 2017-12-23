@@ -4,7 +4,8 @@ import (
   "github.com/lichuang/gpaxos/config"
   "github.com/lichuang/gpaxos"
   "github.com/lichuang/gpaxos/statemachine"
-  "sync"
+	"github.com/lichuang/gpaxos/util"
+	"fmt"
 )
 
 const (
@@ -21,7 +22,7 @@ type Committer struct {
   timeoutMs   uint64
   lastLogTime uint64
 
-  mutex sync.Mutex
+  waitLock util.Waitlock
 }
 
 func newCommitter(instance *Instance) *Committer {
@@ -56,8 +57,12 @@ func (self *Committer) newValueGetID(value []byte, context *gpaxos.StateMachineC
 }
 
 func (self *Committer) newValueGetIDNoRetry(value []byte, context *gpaxos.StateMachineContext) (uint64, error) {
-  self.mutex.Lock()
-  defer self.mutex.Unlock()
+	start := util.NowTimeMs()
+	_, err := self.waitLock.Lock(5000)
+	if err == util.Waitlock_Timeout {
+		fmt.Printf("diff: %d\n", util.NowTimeMs() - start)
+		return 0, gpaxos.PaxosTryCommitRet_Timeout
+	}
 
   var smid int32 = 0
   if context != nil {
@@ -68,5 +73,9 @@ func (self *Committer) newValueGetIDNoRetry(value []byte, context *gpaxos.StateM
   self.commitCtx.newCommit(packValue, context)
   self.instance.sendCommitMsg()
 
-  return self.commitCtx.getResult()
+  instanceId, err := self.commitCtx.getResult()
+
+	self.waitLock.Unlock()
+
+	return instanceId, err
 }

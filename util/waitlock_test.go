@@ -57,7 +57,7 @@ func TestManyWaitlock(t *testing.T) {
 
 	wl := NewWaitlock()
 
-	n := 10
+	n := 100
 	fmt.Printf("begin test TestManyWaitlock....\n")
 	var waitGroup sync.WaitGroup
 
@@ -68,13 +68,14 @@ func TestManyWaitlock(t *testing.T) {
 		TestAssert(t,
 			err == nil,
 			"wait lock should success")
-		time.Sleep(1 * time.Second)
 		wl.Unlock()
 	}()
 
 	for n > 0 {
 		n--
 		go func() {
+			// sleep for routine get the lock
+			time.Sleep(1 * time.Second)
 			_, err :=wl.Lock(2000)
 			TestAssert(t,
 				err == nil,
