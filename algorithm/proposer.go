@@ -9,6 +9,7 @@ import (
 
   log "github.com/lichuang/log4go"
   "math/rand"
+	"github.com/lichuang/gpaxos"
 )
 
 type Proposer struct {
@@ -26,7 +27,8 @@ type Proposer struct {
   canSkipPrepare       bool
   wasRejectBySomeone   bool
   timerThread          *util.TimerThread
-  //timeStat             *util.TimeStat
+  timeOutMs 					 uint32
+  lastStatTimeMs   		 uint64
 }
 
 func NewProposer(instance *Instance) *Proposer {
@@ -37,7 +39,6 @@ func NewProposer(instance *Instance) *Proposer {
     msgCounter:  NewMsgCounter(instance.config),
     learner:     instance.learner,
     timerThread: instance.timerThread,
-    //timeStat: util.NewTimeStat(),
   }
 
   proposer.InitForNewPaxosInstance(false)
@@ -69,13 +70,15 @@ func (self *Proposer) isWorking() bool {
   return self.prepareTimerId > 0 || self.acceptTimerId > 0
 }
 
-func (self *Proposer) NewValue(value []byte) {
+func (self *Proposer) NewValue(value []byte, timeOusMs uint32) {
   if len(self.state.GetValue()) == 0 {
     self.state.SetValue(value)
   }
 
   self.lastPrepareTimeoutMs = common.GetStartPrepareTimeoutMs()
   self.lastAcceptTimeoutMs = common.GetStartAcceptTimeoutMs()
+  self.timeOutMs = timeOusMs
+  self.lastStatTimeMs = util.NowTimeMs()
 
   if self.canSkipPrepare && !self.wasRejectBySomeone {
     log.Info("skip prepare,directly start accept")
@@ -85,10 +88,26 @@ func (self *Proposer) NewValue(value []byte) {
   }
 }
 
+func (self *Proposer) isTimeout() bool {
+	now := util.NowTimeMs()
+	diff := now - self.lastStatTimeMs
+	self.timeOutMs -= uint32(diff)
+	if self.timeOutMs <= 0 {
+		log.Debug("[%s]instance %d timeout", self.instance.String(), self.instanceId)
+		self.instance.commitctx.setResult(gpaxos.PaxosTryCommitRet_Timeout, self.instanceId, []byte(""))
+		return true
+	}
+
+	self.lastStatTimeMs = now
+	return false
+}
+
 func (self *Proposer) prepare(needNewBallot bool) {
+	if self.isTimeout() {
+		return
+	}
   base := self.Base
   state := self.state
-
 
   // first reset all state
   self.exitAccept()
@@ -138,8 +157,11 @@ func (self *Proposer) addPrepareTimer(timeOutMs uint32) {
     self.prepareTimerId = 0
   }
 
+  if timeOutMs > self.timeOutMs {
+  	timeOutMs = self.timeOutMs
+	}
+
   self.prepareTimerId = self.timerThread.AddTimer(timeOutMs, PrepareTimer, self.instance)
-  log.Debug("[%s]add prepare timer %d timeout %dms", self.instance.String(), self.prepareTimerId, timeOutMs)
   self.lastPrepareTimeoutMs *= 2
   if self.lastPrepareTimeoutMs > common.GetMaxPrepareTimeoutMs() {
     self.lastPrepareTimeoutMs = common.GetMaxPrepareTimeoutMs()
@@ -152,8 +174,10 @@ func (self *Proposer) addAcceptTimer(timeOutMs uint32) {
     self.acceptTimerId = 0
   }
 
+	if timeOutMs > self.timeOutMs {
+		timeOutMs = self.timeOutMs
+	}
   self.acceptTimerId = self.timerThread.AddTimer(timeOutMs, AcceptTimer, self.instance)
-  log.Debug("[%s]add accept timer %d timeout %dms", self.instance.String(), self.acceptTimerId, timeOutMs)
   self.lastAcceptTimeoutMs *= 2
   if self.lastAcceptTimeoutMs > common.GetMaxAcceptTimeoutMs() {
     self.lastAcceptTimeoutMs = common.GetMaxAcceptTimeoutMs()
@@ -201,6 +225,9 @@ func (self *Proposer) OnPrepareReply(msg *common.PaxosMsg) error {
 }
 
 func (self *Proposer) accept() {
+	if self.isTimeout() {
+		return
+	}
 	base := self.Base
 	state := self.state
 

@@ -7,8 +7,6 @@ import (
   "sync"
   "github.com/lichuang/gpaxos/util"
   log "github.com/lichuang/log4go"
-  "time"
-	"fmt"
 )
 
 type CommitContext struct {
@@ -116,7 +114,6 @@ func (self *CommitContext) setResult(commitret error, instanceId uint64, learnVa
   }
 
   self.commitRet = commitret
-  log.Debug("[%s]instance %d setresult my %s, learn: %s", self.instance.String(), instanceId, string(self.value), string(learnValue))
   if self.commitRet == gpaxos.PaxosTryCommitRet_OK {
     if bytes.Compare(self.value, learnValue) != 0 {
       self.commitRet = gpaxos.PaxosTryCommitRet_Conflict
@@ -131,30 +128,10 @@ func (self *CommitContext) setResult(commitret error, instanceId uint64, learnVa
   self.wait <- true
 }
 
-func (self *CommitContext) getResult() (uint64, error) {
-  timer := time.NewTimer(3000 * time.Millisecond)
-  timeOut := false
-
+func (self *CommitContext) getResult()(uint64, error) {
   select {
-  case <- timer.C:
-    timeOut = true
-    break
   case <- self.wait:
     break
-  }
-
-  if !timeOut && !timer.Stop() {
-    select {
-    // otherwise should wait timer
-    case <- timer.C:
-    default:
-    }
-  }
-
-  self.end = util.NowTimeMs()
-  if timeOut {
-  	fmt.Printf("[%s]timeout\n", self.instance.String())
-    return 0, gpaxos.PaxosTryCommitRet_Timeout
   }
 
   if self.commitRet == gpaxos.PaxosTryCommitRet_OK {

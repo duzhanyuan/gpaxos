@@ -215,10 +215,10 @@ func (self *Instance) onCommit() {
     self.commitctx.setResultOnlyRet(gpaxos.PaxosTryCommitRet_Value_Size_TooLarge)
   }
 
-	self.commitctx.StartCommit(self.proposer.GetInstanceId())
+	timeOutMs := self.commitctx.StartCommit(self.proposer.GetInstanceId())
 
 	log.Debug("[%s]start commit instance %d", self.String(), self.proposer.GetInstanceId())
-  self.proposer.NewValue(self.commitctx.getCommitValue())
+  self.proposer.NewValue(self.commitctx.getCommitValue(), timeOutMs)
 }
 
 func (self *Instance) String() string {

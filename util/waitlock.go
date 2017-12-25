@@ -34,7 +34,6 @@ func (self *Waitlock) Lock(waitMs int) (int, error) {
 		self.inUse = true
 		getLock = true
 	} else {
-		//atomic.AddInt32(&self.waitCount, 1)
 		self.waitCount += 1
 	}
 	self.mutex.Unlock()
@@ -54,8 +53,7 @@ func (self *Waitlock) Lock(waitMs int) (int, error) {
 	}
 
 	self.mutex.Lock()
-	//atomic.AddInt32(&self.waitCount, -1)
-	self.waitCount += 1
+	self.waitCount -= 1
 	self.mutex.Unlock()
 	if timeOut {
 		return -1, Waitlock_Timeout
@@ -68,7 +66,7 @@ func (self *Waitlock) Lock(waitMs int) (int, error) {
 func (self *Waitlock) Unlock() {
 	self.mutex.Lock()
 	self.inUse = false
-	if self.waitCount == 1 {
+	if self.waitCount == 0 {
 		self.mutex.Unlock()
 		return
 	}

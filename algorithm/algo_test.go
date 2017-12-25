@@ -16,7 +16,7 @@ import (
 )
 
 const (
-  LogToConsole = true
+  LogToConsole = false
 )
 
 func ndecided(t *testing.T, instances []*Instance, seq uint64) int {
@@ -254,14 +254,6 @@ func TestMany(t *testing.T) {
   }
 
   fmt.Printf("Test: Many proposer ...\n")
-
-  /*
-  for i:= 0; i < 10; i++{
-  	ind, err:=ins[0].Propose([]byte("value"))
-  	fmt.Printf("[%d]%d:%v\n", i, ind, err)
-	}
-	return
-	*/
 
   var mutex sync.Mutex
   var instanceMap map[uint64]bool = make(map[uint64]bool)

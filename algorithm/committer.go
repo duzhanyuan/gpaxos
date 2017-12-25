@@ -58,12 +58,16 @@ func (self *Committer) newValueGetID(value []byte, context *gpaxos.StateMachineC
 }
 
 func (self *Committer) newValueGetIDNoRetry(value []byte, context *gpaxos.StateMachineContext) (uint64, error) {
-	diff, err := self.waitLock.Lock(int(self.timeoutMs))
+	lockUseTime, err := self.waitLock.Lock(int(self.timeoutMs))
 	if err == util.Waitlock_Timeout {
 		return 0, gpaxos.PaxosTryCommitRet_WaitTimeout
 	}
 
-	self.timeoutMs -= uint32(diff)
+	self.timeoutMs -= uint32(lockUseTime)
+	if self.timeoutMs <= 200 {
+		self.waitLock.Unlock()
+		return 0, gpaxos.PaxosTryCommitRet_Timeout
+	}
 
   var smid int32 = 0
   if context != nil {
