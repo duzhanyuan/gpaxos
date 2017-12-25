@@ -56,7 +56,7 @@ func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instanc
     factory:      statemachine.NewStatemachineFactory(),
     timerThread:  util.NewTimerThread(),
     endChan:      make(chan bool),
-    commitChan:   make(chan CommitMsg, 1),
+    commitChan:   make(chan CommitMsg),
     paxosMsgChan: make(chan *common.PaxosMsg, 100),
     retryMsgList: list.New(),
   }
@@ -216,9 +216,8 @@ func (self *Instance) onCommit() {
   }
 
 	self.commitctx.StartCommit(self.proposer.GetInstanceId())
-  // ok, now do commit
-  //self.commitctx.StartCommit(self.proposer.GetInstanceId())
 
+	log.Debug("[%s]start commit instance %d", self.String(), self.proposer.GetInstanceId())
   self.proposer.NewValue(self.commitctx.getCommitValue())
 }
 
@@ -267,12 +266,12 @@ func (self *Instance) receiveMsgForLearner(msg *common.PaxosMsg) error {
     isMyCommit,_ := commitCtx.IsMyCommit(msg.GetNodeID(), learner.GetInstanceId(), learner.GetLearnValue())
     if isMyCommit {
       log.Debug("[%s]instance %d is my commit", self.name, learner.GetInstanceId())
-      // only my commit setresult
     } else {
       log.Debug("[%s]instance %d is not my commit", self.name, learner.GetInstanceId())
     }
 
 		commitCtx.setResult(gpaxos.PaxosTryCommitRet_OK, learner.GetInstanceId(), learner.GetLearnValue())
+
     self.NewInstance(isMyCommit)
 
     log.Info("[%s]new paxos instance has started, Now instance id:proposer %d, acceptor %d, learner %d",

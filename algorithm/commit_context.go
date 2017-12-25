@@ -8,6 +8,7 @@ import (
   "github.com/lichuang/gpaxos/util"
   log "github.com/lichuang/log4go"
   "time"
+	"fmt"
 )
 
 type CommitContext struct {
@@ -24,6 +25,8 @@ type CommitContext struct {
 
   instance            *Instance
 
+  timeoutMs 					uint32
+
   // wait result channel
   wait                chan bool
 }
@@ -39,7 +42,7 @@ func newCommitContext(instance *Instance) *CommitContext {
   return context
 }
 
-func (self *CommitContext) newCommit(value []byte, context *gpaxos.StateMachineContext) {
+func (self *CommitContext) newCommit(value []byte, timeoutMs uint32, context *gpaxos.StateMachineContext) {
   self.mutex.Lock()
 
   self.instanceId = common.INVALID_INSTANCEID
@@ -48,6 +51,7 @@ func (self *CommitContext) newCommit(value []byte, context *gpaxos.StateMachineC
   self.stateMachineContext = context
   self.end = 0
   self.start = util.NowTimeMs()
+  self.timeoutMs = timeoutMs
 
   self.mutex.Unlock()
 }
@@ -56,11 +60,12 @@ func (self *CommitContext) isNewCommit() bool {
   return self.instanceId == common.INVALID_INSTANCEID && self.value != nil
 }
 
-func (self *CommitContext) StartCommit(instanceId uint64) {
+func (self *CommitContext) StartCommit(instanceId uint64) uint32 {
   self.mutex.Lock()
-  log.Debug("[%s]start commit %d", self.instance.String(), instanceId)
   self.instanceId = instanceId
   self.mutex.Unlock()
+
+  return self.timeoutMs
 }
 
 func (self *CommitContext) getCommitValue() [] byte {
@@ -91,7 +96,7 @@ func (self *CommitContext) IsMyCommit(nodeId uint64, instanceId uint64, learnVal
   if isMyCommit {
     ctx = self.stateMachineContext
   } else {
-  	log.Debug("[%s]%d not my commit %v", self.instance.String(), instanceId, self.commitEnd)
+  	log.Debug("[%s]%d not my commit %v:%d", self.instance.String(), instanceId, self.commitEnd, self.instanceId)
 	}
 
   return isMyCommit, ctx
@@ -111,7 +116,8 @@ func (self *CommitContext) setResult(commitret error, instanceId uint64, learnVa
   }
 
   self.commitRet = commitret
-  if self.commitRet == nil {
+  log.Debug("[%s]instance %d setresult my %s, learn: %s", self.instance.String(), instanceId, string(self.value), string(learnValue))
+  if self.commitRet == gpaxos.PaxosTryCommitRet_OK {
     if bytes.Compare(self.value, learnValue) != 0 {
       self.commitRet = gpaxos.PaxosTryCommitRet_Conflict
     }
@@ -120,7 +126,7 @@ func (self *CommitContext) setResult(commitret error, instanceId uint64, learnVa
   self.commitEnd = true
   self.value = nil
 
-  log.Debug("[%s]set commit result instance %d", self.instance.String(),instanceId)
+  log.Debug("[%s]set commit result instance %d ret %v", self.instance.String(),instanceId,self.commitRet)
 
   self.wait <- true
 }
@@ -147,6 +153,7 @@ func (self *CommitContext) getResult() (uint64, error) {
 
   self.end = util.NowTimeMs()
   if timeOut {
+  	fmt.Printf("[%s]timeout\n", self.instance.String())
     return 0, gpaxos.PaxosTryCommitRet_Timeout
   }
 

@@ -11,6 +11,7 @@ var (
   PaxosTryCommitRet_Im_Not_In_Membership        = errors.New("PaxosTryCommitRet_Im_Not_In_Membership")
   PaxosTryCommitRet_Value_Size_TooLarge         = errors.New("PaxosTryCommitRet_Value_Size_TooLarge")
   PaxosTryCommitRet_Timeout                     = errors.New("PaxosTryCommitRet_Timeout")
+	PaxosTryCommitRet_WaitTimeout                 = errors.New("PaxosTryCommitRet_WaitTimeout")
   PaxosTryCommitRet_TooManyThreadWaiting_Reject = errors.New("PaxosTryCommitRet_TooManyThreadWaiting_Reject")
 )
 

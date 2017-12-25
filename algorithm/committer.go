@@ -5,7 +5,7 @@ import (
   "github.com/lichuang/gpaxos"
   "github.com/lichuang/gpaxos/statemachine"
 	"github.com/lichuang/gpaxos/util"
-	"fmt"
+	"github.com/lichuang/gpaxos/common"
 )
 
 const (
@@ -19,7 +19,7 @@ type Committer struct {
 
   instance *Instance
 
-  timeoutMs   uint64
+  timeoutMs   uint32
   lastLogTime uint64
 
   waitLock util.Waitlock
@@ -35,13 +35,14 @@ func newCommitter(instance *Instance) *Committer {
 }
 
 func (self *Committer) NewValue(value []byte) (uint64, error) {
+	self.timeoutMs = common.GetMaxCommitTimeoutMs()
   return self.newValueGetID(value, nil)
 }
 
 func (self *Committer) newValueGetID(value []byte, context *gpaxos.StateMachineContext) (uint64, error) {
   err := gpaxos.PaxosTryCommitRet_OK
   var instanceid uint64
-  for retryCnt := MaxTryCount; retryCnt > 0; retryCnt-- {
+  for i := 0; i < MaxTryCount && self.timeoutMs > 0; i++ {
     instanceid, err = self.newValueGetIDNoRetry(value, context)
 
     if err != gpaxos.PaxosTryCommitRet_Conflict {
@@ -57,12 +58,12 @@ func (self *Committer) newValueGetID(value []byte, context *gpaxos.StateMachineC
 }
 
 func (self *Committer) newValueGetIDNoRetry(value []byte, context *gpaxos.StateMachineContext) (uint64, error) {
-	start := util.NowTimeMs()
-	_, err := self.waitLock.Lock(5000)
+	diff, err := self.waitLock.Lock(int(self.timeoutMs))
 	if err == util.Waitlock_Timeout {
-		fmt.Printf("diff: %d\n", util.NowTimeMs() - start)
-		return 0, gpaxos.PaxosTryCommitRet_Timeout
+		return 0, gpaxos.PaxosTryCommitRet_WaitTimeout
 	}
+
+	self.timeoutMs -= uint32(diff)
 
   var smid int32 = 0
   if context != nil {
@@ -70,7 +71,7 @@ func (self *Committer) newValueGetIDNoRetry(value []byte, context *gpaxos.StateM
   }
 
   packValue := self.factory.PackPaxosValue(value, smid)
-  self.commitCtx.newCommit(packValue, context)
+  self.commitCtx.newCommit(packValue, self.timeoutMs, context)
   self.instance.sendCommitMsg()
 
   instanceId, err := self.commitCtx.getResult()

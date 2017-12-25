@@ -7,7 +7,9 @@ type InsideOptions struct {
   maxPrepareTimeoutMs uint32
 
   acceptTimeousMs uint32
-  maxAcceptTimeousMs uint32
+  maxAcceptTimeoutsMs uint32
+
+  maxCommitTimeoutMs uint32
 }
 
 var gInsideOptions InsideOptions
@@ -16,9 +18,11 @@ func init() {
   gInsideOptions.logFileMaxSize = 1024 * 1024 * 100
 
   gInsideOptions.prepareTimeousMs = 2000
-  gInsideOptions.maxPrepareTimeoutMs = 8000
+  gInsideOptions.maxPrepareTimeoutMs = 2000
   gInsideOptions.acceptTimeousMs = 1000
-  gInsideOptions.maxAcceptTimeousMs = 8000
+  gInsideOptions.maxAcceptTimeoutsMs = 2000
+
+  gInsideOptions.maxCommitTimeoutMs = 5000
 }
 
 func (self *InsideOptions) GetLogFileMaxSize() int64 {
@@ -70,7 +74,11 @@ func GetMaxPrepareTimeoutMs() uint32 {
 }
 
 func GetMaxAcceptTimeoutMs() uint32 {
-  return  gInsideOptions.maxAcceptTimeousMs
+  return  gInsideOptions.maxAcceptTimeoutsMs
+}
+
+func GetMaxCommitTimeoutMs() uint32 {
+	return gInsideOptions.maxCommitTimeoutMs
 }
 
 func GetCleanerDeleteQps() uint32 {

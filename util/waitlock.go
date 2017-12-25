@@ -4,7 +4,6 @@ import (
 	"time"
 	"sync"
 	"errors"
-	log "github.com/lichuang/log4go"
 )
 
 var Waitlock_Timeout = errors.New("waitlock timeout")
@@ -25,7 +24,6 @@ func NewWaitlock() *Waitlock {
 }
 
 func (self *Waitlock) Lock(waitMs int) (int, error) {
-	log.Debug("in lock")
 	timeOut := false
 
 	now := NowTimeMs()
@@ -60,7 +58,6 @@ func (self *Waitlock) Lock(waitMs int) (int, error) {
 	self.waitCount += 1
 	self.mutex.Unlock()
 	if timeOut {
-		log.Debug("lock timeout")
 		return -1, Waitlock_Timeout
 	}
 	timer.Stop()
@@ -69,7 +66,6 @@ func (self *Waitlock) Lock(waitMs int) (int, error) {
 }
 
 func (self *Waitlock) Unlock() {
-	log.Debug("in unlock")
 	self.mutex.Lock()
 	self.inUse = false
 	if self.waitCount == 1 {
@@ -88,7 +84,6 @@ func (self *Waitlock) Unlock() {
 		break
 	}
 
-	log.Debug("unlock")
 	if !timeOut {
 		timer.Stop()
 	}

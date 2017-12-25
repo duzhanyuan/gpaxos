@@ -16,7 +16,7 @@ import (
 )
 
 const (
-  LogToConsole = false
+  LogToConsole = true
 )
 
 func ndecided(t *testing.T, instances []*Instance, seq uint64) int {
@@ -255,6 +255,14 @@ func TestMany(t *testing.T) {
 
   fmt.Printf("Test: Many proposer ...\n")
 
+  /*
+  for i:= 0; i < 10; i++{
+  	ind, err:=ins[0].Propose([]byte("value"))
+  	fmt.Printf("[%d]%d:%v\n", i, ind, err)
+	}
+	return
+	*/
+
   var mutex sync.Mutex
   var instanceMap map[uint64]bool = make(map[uint64]bool)
 
@@ -269,19 +277,13 @@ func TestMany(t *testing.T) {
 			mutex.Lock()
 			defer mutex.Unlock()
 			i := index % npaxos
-			value := fmt.Sprintf("instance_%d", i + 1)
+			value := fmt.Sprintf("instance_%d", index)
 			ind, err := ins[i].Propose([]byte(value))
 			fmt.Printf("[%d]instance %d, ind: %d, err:%v\n", index, i + 1, ind, err)
 			if err == gpaxos.PaxosTryCommitRet_OK {
 				_, ok := instanceMap[ind]
 				if ok {
-					t.Fatalf("duplicate instance id")
-				}
-				if ind > 1 {
-					_, ok := instanceMap[ind - 1]
-					if !ok {
-						t.Fatalf("instance id hole")
-					}
+					t.Fatalf("duplicate instance id %d", ind)
 				}
 
 				instanceMap[ind] = true
@@ -290,6 +292,21 @@ func TestMany(t *testing.T) {
 	}
 
 	waitGroup.Wait()
+
+	maxInstanceId := 0
+	for i := 1; i < num;i++ {
+		_, ok := instanceMap[uint64(i)]
+		if ok && i > maxInstanceId {
+			maxInstanceId = i
+		}
+	}
+
+	for i := maxInstanceId; i >= 1;i-- {
+		_, ok := instanceMap[uint64(i)]
+		if !ok {
+			t.Fatalf("hole instance id %d", i)
+		}
+	}
 
   fmt.Printf("  ... Passed...........\n")
 }
