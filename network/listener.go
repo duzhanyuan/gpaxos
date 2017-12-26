@@ -4,6 +4,7 @@ import (
   "net"
   log "github.com/lichuang/log4go"
   "time"
+	"sync"
 )
 
 const (
@@ -18,6 +19,7 @@ type Listener struct {
   stopChan chan bool
   end bool
   sessionMap map[string]Session
+  mutex sync.Mutex
 }
 
 func NewListener(addr string, factory SessionFactory) *Listener {
@@ -46,7 +48,6 @@ func (self *Listener) Run() {
 }
 
 func (self *Listener) main() {
-
   for {
     self.SetDeadline(time.Now().Add(MaxWaitIOTime))
 
@@ -74,8 +75,20 @@ func (self *Listener) main() {
       return
     }
     session := self.factory.Create(conn)
-    self.sessionMap[conn.RemoteAddr().String()] = session
-    go session.Handle()
+    addr := conn.RemoteAddr().String()
+
+    self.mutex.Lock()
+    self.sessionMap[addr] = session
+		self.mutex.Unlock()
+
+    go func(addr string) {
+			session.Handle()
+
+			log.Info("close connection from %s", addr)
+			self.mutex.Lock()
+			delete(self.sessionMap, addr)
+			self.mutex.Unlock()
+		} (addr)
   }
 }
 
@@ -84,7 +97,9 @@ func (self *Listener) Stop() {
   close(self.stopChan)
   self.TCPListener.Close()
 
+  self.mutex.Lock()
   for _, session := range self.sessionMap {
     session.Stop()
   }
+	self.mutex.Unlock()
 }

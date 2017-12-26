@@ -27,7 +27,7 @@ type Proposer struct {
   canSkipPrepare       bool
   wasRejectBySomeone   bool
   timerThread          *util.TimerThread
-  timeOutMs 					 int32
+  timeOutMs 					 uint32
   lastStatTimeMs   		 uint64
 }
 
@@ -77,7 +77,7 @@ func (self *Proposer) NewValue(value []byte, timeOusMs uint32) {
 
   self.lastPrepareTimeoutMs = common.GetStartPrepareTimeoutMs()
   self.lastAcceptTimeoutMs = common.GetStartAcceptTimeoutMs()
-  self.timeOutMs = int32(timeOusMs)
+  self.timeOutMs = timeOusMs
   self.lastStatTimeMs = util.NowTimeMs()
 
   if self.canSkipPrepare && !self.wasRejectBySomeone {
@@ -91,7 +91,9 @@ func (self *Proposer) NewValue(value []byte, timeOusMs uint32) {
 func (self *Proposer) isTimeout() bool {
 	now := util.NowTimeMs()
 	diff := now - self.lastStatTimeMs
-	self.timeOutMs -= int32(diff)
+	if uint32(diff) >= self.timeOutMs {
+		self.timeOutMs = 0
+	}
 	log.Debug("[%s]last:%d, diff:%d,timeout:%d", self.instance.String(), self.lastStatTimeMs, diff, self.timeOutMs)
 	if self.timeOutMs <= 0 {
 		log.Debug("[%s]instance %d timeout", self.instance.String(), self.instanceId)
@@ -158,7 +160,7 @@ func (self *Proposer) addPrepareTimer(timeOutMs uint32) {
     self.prepareTimerId = 0
   }
 
-  if int32(timeOutMs) > self.timeOutMs {
+  if timeOutMs > self.timeOutMs {
   	timeOutMs = uint32(self.timeOutMs)
 	}
 
@@ -175,7 +177,7 @@ func (self *Proposer) addAcceptTimer(timeOutMs uint32) {
     self.acceptTimerId = 0
   }
 
-	if int32(timeOutMs) > self.timeOutMs {
+	if timeOutMs > self.timeOutMs {
 		timeOutMs = uint32(self.timeOutMs)
 	}
   self.acceptTimerId = self.timerThread.AddTimer(timeOutMs, AcceptTimer, self.instance)
