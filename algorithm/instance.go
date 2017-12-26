@@ -217,7 +217,7 @@ func (self *Instance) onCommit() {
 
 	timeOutMs := self.commitctx.StartCommit(self.proposer.GetInstanceId())
 
-	log.Debug("[%s]start commit instance %d", self.String(), self.proposer.GetInstanceId())
+	log.Debug("[%s]start commit instance %d, timeout:%d", self.String(), self.proposer.GetInstanceId(), timeOutMs)
   self.proposer.NewValue(self.commitctx.getCommitValue(), timeOutMs)
 }
 
