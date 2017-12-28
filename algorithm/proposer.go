@@ -91,15 +91,16 @@ func (self *Proposer) NewValue(value []byte, timeOusMs uint32) {
 func (self *Proposer) isTimeout() bool {
 	now := util.NowTimeMs()
 	diff := now - self.lastStatTimeMs
+	log.Debug("[%s]diff %d, timeout %d",self.instance.String(), diff, self.timeOutMs)
 	if uint32(diff) >= self.timeOutMs {
 		self.timeOutMs = 0
 	}
-	log.Debug("[%s]last:%d, diff:%d,timeout:%d", self.instance.String(), self.lastStatTimeMs, diff, self.timeOutMs)
 	if self.timeOutMs <= 0 {
 		log.Debug("[%s]instance %d timeout", self.instance.String(), self.instanceId)
 		self.instance.commitctx.setResult(gpaxos.PaxosTryCommitRet_Timeout, self.instanceId, []byte(""))
 		return true
 	}
+	self.timeOutMs -= uint32(diff)
 
 	self.lastStatTimeMs = now
 	return false

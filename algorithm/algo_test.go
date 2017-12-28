@@ -258,7 +258,7 @@ func TestMany(t *testing.T) {
   var mutex sync.Mutex
   var instanceMap map[uint64]bool = make(map[uint64]bool)
 
-  num := npaxos * 50
+  num := npaxos * 100
 
   var waitGroup sync.WaitGroup
   waitGroup.Add(num)

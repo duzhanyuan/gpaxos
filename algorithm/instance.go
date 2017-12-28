@@ -74,6 +74,7 @@ func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instanc
   maxInstanceId, err := logStorage.GetMaxInstanceID()
   log.Debug("max instance id:%d:%v， propose id:%d", maxInstanceId, err, instance.proposer.GetInstanceId())
 
+  //instance.learner.Reset_AskforLearn_Noop(common.GetAskforLearnInterval())
   start := make(chan bool)
   go instance.main(start)
   <- start
@@ -258,9 +259,29 @@ func (self *Instance) receiveMsgForLearner(msg *common.PaxosMsg) error {
   learner := self.learner
   msgType := msg.GetMsgType()
 
-  if msgType == common.MsgType_PaxosLearner_ProposerSendSuccess {
-    learner.OnProposerSendSuccess(msg)
-  }
+  switch msgType {
+	case common.MsgType_PaxosLearner_AskforLearn:
+		learner.OnAskforLearn(msg)
+		break
+	case common.MsgType_PaxosLearner_SendLearnValue:
+		learner.OnSendLearnValue(msg)
+		break
+	case common.MsgType_PaxosLearner_ProposerSendSuccess:
+		learner.OnProposerSendSuccess(msg)
+		break
+	case common.MsgType_PaxosLearner_SendNowInstanceID:
+		learner.OnSendNowInstanceId(msg)
+		break
+	case common.MsgType_PaxosLearner_ConfirmAskforLearn:
+		learner.OnConfirmAskForLearn(msg)
+		break
+	case common.MsgType_PaxosLearner_SendLearnValue_Ack:
+		learner.OnSendLearnValue_Ack(msg)
+		break
+	case common.MsgType_PaxosLearner_AskforCheckpoint:
+		learner.OnAskforCheckpoint(msg)
+		break
+	}
   if learner.IsLearned() {
     commitCtx := self.commitctx
     isMyCommit,_ := commitCtx.IsMyCommit(msg.GetNodeID(), learner.GetInstanceId(), learner.GetLearnValue())
@@ -351,7 +372,7 @@ func (self *Instance) receiveMsgForAcceptor(msg *common.PaxosMsg, isRetry bool) 
 
   // ignore expired msg
   if msgInstanceId <= acceptorInstanceId {
-    log.Debug("[%s]ignore expired msg from %d", self.name, msg.GetNodeID())
+    log.Debug("[%s]ignore expired %d msg from %d, now %d", self.name, msgInstanceId, msg.GetNodeID(), acceptorInstanceId)
     return nil
   }
 
@@ -427,11 +448,18 @@ func (self *Instance) OnReceivePaxosMsg(msg *common.PaxosMsg, isRetry bool) erro
 func (self *Instance)OnTimeout(timer *util.Timer) {
   if timer.TimerType == PrepareTimer {
     self.proposer.onPrepareTimeout()
+    return
   }
 
   if timer.TimerType == AcceptTimer {
     self.proposer.onAcceptTimeout()
+		return
   }
+
+  if timer.TimerType == LearnerTimer {
+		self.learner.AskforLearn_Noop()
+		return
+	}
 }
 
 func (self *Instance)OnReceiveMsg(buffer []byte, cmd int32) error {

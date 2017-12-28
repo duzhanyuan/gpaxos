@@ -35,6 +35,7 @@ func NewLearner(instance *Instance) *Learner {
     lastAckInstanceId:                1,
     state:                            NewLearnerState(instance),
     instance:                         instance,
+    timerThread: 											instance.timerThread,
   }
   learner.sender = NewLearnerSender(instance, learner)
 
@@ -93,10 +94,10 @@ func (self *Learner) Reset_AskforLearn_Noop(timeout uint32) {
     self.timerThread.DelTimer(self.askforlearnNoopTimerID)
   }
 
-  self.askforlearnNoopTimerID = self.timerThread.AddTimer(timeout, LearnerTimer, self)
+  self.askforlearnNoopTimerID = self.timerThread.AddTimer(timeout, LearnerTimer, self.instance)
 }
 
-func (self *Learner) AskforLearn_Noop(isStart bool) {
+func (self *Learner) AskforLearn_Noop() {
   self.Reset_AskforLearn_Noop(common.GetAskforLearnInterval())
   self.isImLearning = false
   self.askforLearn()
@@ -166,9 +167,10 @@ func (self *Learner) sendNowInstanceID(instanceId uint64, sendNodeId uint64) {
     NodeID:              proto.Uint64(self.config.GetMyNodeId()),
     MsgType:             proto.Int32(common.MsgType_PaxosLearner_SendNowInstanceID),
     NowInstanceID:       proto.Uint64(self.GetInstanceId()),
+    //MinChosenInstanceID:
   }
 
-  if self.GetInstanceId()-instanceId > 50 {
+  if self.GetInstanceId() - instanceId > 50 {
     /*
     systemVarBuffer, err := self.config.GetSystemVSM().GetCheckpointBuffer()
     if err == nil {
@@ -183,6 +185,55 @@ func (self *Learner) sendNowInstanceID(instanceId uint64, sendNodeId uint64) {
   }
 
   self.sendPaxosMessage(sendNodeId, msg)
+}
+
+func (self *Learner) OnSendNowInstanceId(msg *common.PaxosMsg) {
+	instance := self.instance
+
+	log.Info("[%s]start msg.instanceid %d now.instanceid %d msg.from_nodeid %d msg.maxinstanceid %d",
+		instance.String(), msg.GetInstanceID(), self.instanceId, msg.GetNodeID(), msg.GetNowInstanceID())
+
+	self.SetSeenInstanceID(msg.GetNowInstanceID(), msg.GetNodeID())
+
+	if msg.GetInstanceID() != self.instanceId {
+		log.Error("[%s]lag msg instanceid %d", instance.String(), msg.GetInstanceID())
+		return
+	}
+
+	if msg.GetNowInstanceID() <= self.instanceId {
+		log.Error("[%s]lag msg instanceid %d", instance.String(), msg.GetNowInstanceID())
+		return
+	}
+
+	if msg.GetMinChosenInstanceID() > self.instanceId {
+
+	} else if (!self.isImLearning) {
+		self.confirmAskForLearn(msg.GetNodeID())
+	}
+}
+
+func (self *Learner) confirmAskForLearn(sendNodeId uint64) {
+	msg := &common.PaxosMsg{
+		InstanceID: proto.Uint64(self.instanceId),
+		NodeID:     proto.Uint64(self.config.GetMyNodeId()),
+		MsgType:    proto.Int32(common.MsgType_PaxosLearner_ConfirmAskforLearn),
+	}
+	self.sendPaxosMessage(sendNodeId, msg)
+}
+
+func (self *Learner) OnConfirmAskForLearn(msg *common.PaxosMsg) {
+	log.Info("start msg.instanceid %d msg.from nodeid %d", msg.GetInstanceID(), msg.GetNodeID())
+
+	if !self.sender.Confirm(msg.GetInstanceID(), msg.GetNodeID()) {
+		log.Error("learner sender confirm fail,maybe is lag msg")
+		return
+	}
+
+	log.Info("ok, success confirm")
+}
+
+func (self *Learner) OnAskforCheckpoint(msg *common.PaxosMsg) {
+
 }
 
 func (self *Learner) SendLearnValue(sendNodeId uint64, learnInstanceId uint64,
@@ -330,7 +381,3 @@ func (self *Learner) TransmitToFollower() {
   log.Info("OK")
 }
 */
-
-func (self *Learner)OnTimeout(timer *util.Timer) {
-  log.Debug("learner timeout type:%d", timer.TimerType)
-}
