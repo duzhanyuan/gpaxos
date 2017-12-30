@@ -74,7 +74,7 @@ func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instanc
   maxInstanceId, err := logStorage.GetMaxInstanceID()
   log.Debug("max instance id:%d:%v， propose id:%d", maxInstanceId, err, instance.proposer.GetInstanceId())
 
-  //instance.learner.Reset_AskforLearn_Noop(common.GetAskforLearnInterval())
+  instance.learner.Reset_AskforLearn_Noop(common.GetAskforLearnInterval())
   start := make(chan bool)
   go instance.main(start)
   <- start

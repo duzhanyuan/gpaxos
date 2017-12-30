@@ -45,7 +45,7 @@ func (self *Committer) newValueGetID(value []byte, context *gpaxos.StateMachineC
   for i := 0; i < MaxTryCount && self.timeoutMs > 0; i++ {
     instanceid, err = self.newValueGetIDNoRetry(value, context)
 
-    if err != gpaxos.PaxosTryCommitRet_Conflict {
+    if err != gpaxos.PaxosTryCommitRet_Conflict && err != gpaxos.PaxosTryCommitRet_WaitTimeout {
       break
     }
 
@@ -63,24 +63,25 @@ func (self *Committer) newValueGetIDNoRetry(value []byte, context *gpaxos.StateM
 		return 0, gpaxos.PaxosTryCommitRet_WaitTimeout
 	}
 
-	self.timeoutMs -= uint32(lockUseTime)
-	if self.timeoutMs <= 200 {
+	if self.timeoutMs <= uint32(200 + lockUseTime) {
 		self.waitLock.Unlock()
+		self.timeoutMs = 0
 		return 0, gpaxos.PaxosTryCommitRet_Timeout
 	}
 
-  var smid int32 = 0
+	leftTimeoutMs := self.timeoutMs - uint32(lockUseTime)
+
+ 	var smid int32 = 0
   if context != nil {
     smid = context.SMId
   }
 
   packValue := self.factory.PackPaxosValue(value, smid)
-  self.commitCtx.newCommit(packValue, self.timeoutMs, context)
+  self.commitCtx.newCommit(packValue, leftTimeoutMs, context)
   self.instance.sendCommitMsg()
 
   instanceId, err := self.commitCtx.getResult()
 
 	self.waitLock.Unlock()
-
 	return instanceId, err
 }

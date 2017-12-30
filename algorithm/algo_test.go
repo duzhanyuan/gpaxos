@@ -13,6 +13,7 @@ import (
   "bytes"
   "runtime"
 	"sync"
+	"github.com/lichuang/gpaxos/util"
 )
 
 const (
@@ -209,9 +210,16 @@ func TestDeaf(t *testing.T) {
 func TestMany(t *testing.T) {
   runtime.GOMAXPROCS(4)
 
+	tmp, _ := ioutil.TempDir("/tmp", "gpaxos")
+	filepattern := tmp + "/gpaxoslog/gpaxos_%Y%M%D%H.log"
+	log.NewLogger(filepattern, false, log.DEBUG)
+	defer os.RemoveAll(tmp)
+
+	/*
   if LogToConsole {
     log.NewConsoleLogger()
   }
+	*/
 
   npaxos := 5
   var ports []int = []int{11111,11112,11113,11114,11115}
@@ -258,28 +266,31 @@ func TestMany(t *testing.T) {
   var mutex sync.Mutex
   var instanceMap map[uint64]bool = make(map[uint64]bool)
 
-  num := npaxos * 100
+  num := npaxos * 250
 
   var waitGroup sync.WaitGroup
   waitGroup.Add(num)
 
 	for i := 0; i < num;i++ {
 		go func(index int) {
+			now := util.NowTimeMs()
+			//fmt.Printf("start:%d, index %d", now, index)
 			defer waitGroup.Done()
-			mutex.Lock()
-			defer mutex.Unlock()
 			i := index % npaxos
 			value := fmt.Sprintf("instance_%d", index)
 			ind, err := ins[i].Propose([]byte(value))
 			fmt.Printf("[%d]instance %d, ind: %d, err:%v\n", index, i + 1, ind, err)
 			if err == gpaxos.PaxosTryCommitRet_OK {
+				mutex.Lock()
 				_, ok := instanceMap[ind]
 				if ok {
 					t.Fatalf("duplicate instance id %d", ind)
 				}
 
 				instanceMap[ind] = true
+				mutex.Unlock()
 			}
+			fmt.Printf("diff:%d, index %d, err: %v\n", util.NowTimeMs() - now, index, err)
 		}(i)
 	}
 
