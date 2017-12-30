@@ -52,7 +52,7 @@ func (self *LearnerState) LearnValue(instanceId uint64, learnedBallot BallotNumb
     AcceptedValue:  proto.NewBuffer(value).Bytes(),
     PromiseID:      proto.Uint64(learnedBallot.proposalId),
     PromiseNodeID:  proto.Uint64(learnedBallot.nodeId),
-    AcceptedID:     proto.Uint64(learnedBallot.nodeId),
+    AcceptedID:     proto.Uint64(learnedBallot.proposalId),
     AcceptedNodeID: proto.Uint64(learnedBallot.nodeId),
     Checksum:       proto.Uint32(self.newChecksum),
   }
@@ -82,7 +82,7 @@ func (self *LearnerState) IsLearned() bool {
 }
 
 func (self *LearnerState) Init() {
-  self.learnedValue = make([]byte, 0)
+  self.learnedValue = nil
   self.isLearned = false
   self.newChecksum = 0
 }

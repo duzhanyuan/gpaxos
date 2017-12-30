@@ -75,9 +75,10 @@ func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instanc
   log.Debug("max instance id:%d:%v， propose id:%d", maxInstanceId, err, instance.proposer.GetInstanceId())
 
   instance.learner.Reset_AskforLearn_Noop(common.GetAskforLearnInterval())
-  start := make(chan bool)
-  go instance.main(start)
-  <- start
+
+  util.StartRoutine(func() {
+  	instance.main()
+	})
 
   return instance
 }
@@ -88,9 +89,7 @@ func (self *Instance)initNetwork(options *gpaxos.Options) *Instance {
 }
 
 // instance main loop
-func (self *Instance) main(start chan bool) {
-  start <- true
-
+func (self *Instance) main() {
   end := false
   for !end {
     timer := time.NewTimer(100 * time.Millisecond)

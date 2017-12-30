@@ -55,10 +55,9 @@ func NewTimerThread() *TimerThread {
     now: NowTimeMs(),
   }
 
-  start := make(chan bool, 1)
-  go timerThread.main(start)
-  <- start
-
+  StartRoutine(func() {
+  	timerThread.main()
+	})
   return timerThread
 }
 
@@ -66,9 +65,7 @@ func (self *TimerThread) Stop() {
   self.end = true
 }
 
-func (self *TimerThread) main(start chan bool) {
-  start <- true
-
+func (self *TimerThread) main() {
   for !self.end {
     // fire every 1 ms
     timerChan := time.NewTimer(1 * time.Millisecond).C
