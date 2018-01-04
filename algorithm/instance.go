@@ -76,9 +76,7 @@ func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instanc
 
   instance.learner.Reset_AskforLearn_Noop(common.GetAskforLearnInterval())
 
-  util.StartRoutine(func() {
-  	instance.main()
-	})
+  util.StartRoutine(instance.main)
 
   return instance
 }

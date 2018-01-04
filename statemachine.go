@@ -23,20 +23,20 @@ func NewBatchStateMachineContext() *BatchStateMachineContext {
 }
 
 type StateMachine interface {
-  Execute(groupIdx int32, instanceId uint64, paxosValue[]byte, context *StateMachineContext) bool
+  Execute(instanceId uint64, paxosValue[]byte, context *StateMachineContext) error
 
   SMID() int32
 
-  ExecuteForCheckpoint(groupIdx int32, instanceId uint64, paxosValue []byte)bool
+  ExecuteForCheckpoint(instanceId uint64, paxosValue []byte)error
 
-  GetCheckpointInstanceID(groupIdx int32) uint64
+  GetCheckpointInstanceID() uint64
 
   LockCheckpointState() error
 
-  GetCheckpointState(groupIdx int32, dirPath *string, fileList []string) error
+  GetCheckpointState(dirPath *string, fileList []string) error
 
   UnLockCheckpointState()
 
-  LoadCheckpointState(groupIdx int32, checkpointTmpFileDirPath string,
+  LoadCheckpointState(checkpointTmpFileDirPath string,
     fileList []string, checkpointInstanceID uint64) error
 }

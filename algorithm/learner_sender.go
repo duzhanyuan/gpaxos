@@ -42,17 +42,14 @@ func NewLearnerSender(instance *Instance, learner *Learner) *LearnerSender {
 }
 
 func (self *LearnerSender) Start() {
-  start := make(chan bool, 1)
-  go self.main(start)
-  <-start
+  util.StartRoutine(self.main)
 }
 
 func (self *LearnerSender) Stop() {
   self.isEnd = true
 }
 
-func (self *LearnerSender) main(start chan bool) {
-  start <- true
+func (self *LearnerSender) main() {
   self.isStart = true
 
   for {
@@ -110,7 +107,7 @@ func (self *LearnerSender) CheckAck(sendInstanceId uint64) bool {
       return false
     }
 
-    time.Sleep(10 * time.Microsecond)
+    time.Sleep(10 * time.Millisecond)
   }
 
   return true
@@ -167,7 +164,7 @@ func (self *LearnerSender) WaitToSend() {
   self.mutex.Lock()
 
   for !self.isConfirmed {
-    time.Sleep(100 * time.Microsecond)
+    time.Sleep(100 * time.Millisecond)
     if self.isEnd {
       break
     }

@@ -55,9 +55,7 @@ func NewTimerThread() *TimerThread {
     now: NowTimeMs(),
   }
 
-  StartRoutine(func() {
-  	timerThread.main()
-	})
+  StartRoutine(timerThread.main)
   return timerThread
 }
 

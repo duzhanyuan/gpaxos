@@ -86,7 +86,7 @@ func GetCleanerDeleteQps() uint32 {
 }
 
 func GetLeanerSenderPrepareTimeoutMs() uint64 {
-  return 1000
+  return 5000
 }
 
 func GetLeanerSender_Ack_TimeoutMs() uint64 {
@@ -106,7 +106,7 @@ func GetAskforLearnInterval() uint32 {
 }
 
 func GetLeanerReceiver_Ack_Lead() uint64 {
-  return 100
+  return 20
 }
 
 func GetMaxValueSize() int {

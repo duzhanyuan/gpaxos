@@ -189,23 +189,24 @@ func (self *Learner) sendNowInstanceID(instanceId uint64, sendNodeId uint64) {
 
 func (self *Learner) OnSendNowInstanceId(msg *common.PaxosMsg) {
 	instance := self.instance
+	instanceId := self.instanceId
 
 	log.Info("[%s]start msg.instanceid %d now.instanceid %d msg.from_nodeid %d msg.maxinstanceid %d",
 		instance.String(), msg.GetInstanceID(), self.instanceId, msg.GetNodeID(), msg.GetNowInstanceID())
 
 	self.SetSeenInstanceID(msg.GetNowInstanceID(), msg.GetNodeID())
 
-	if msg.GetInstanceID() != self.instanceId {
+	if msg.GetInstanceID() != instanceId {
 		log.Error("[%s]lag msg instanceid %d", instance.String(), msg.GetInstanceID())
 		return
 	}
 
-	if msg.GetNowInstanceID() <= self.instanceId {
+	if msg.GetNowInstanceID() <= instanceId {
 		log.Error("[%s]lag msg instanceid %d", instance.String(), msg.GetNowInstanceID())
 		return
 	}
 
-	if msg.GetMinChosenInstanceID() > self.instanceId {
+	if msg.GetMinChosenInstanceID() > instanceId {
 
 	} else if (!self.isImLearning) {
 		self.confirmAskForLearn(msg.GetNodeID())
@@ -219,6 +220,7 @@ func (self *Learner) confirmAskForLearn(sendNodeId uint64) {
 		MsgType:    proto.Int32(common.MsgType_PaxosLearner_ConfirmAskforLearn),
 	}
 	self.sendPaxosMessage(sendNodeId, msg)
+	self.isImLearning = true
 }
 
 func (self *Learner) OnConfirmAskForLearn(msg *common.PaxosMsg) {
@@ -269,7 +271,7 @@ func (self *Learner) OnSendLearnValue(msg *common.PaxosMsg) {
     log.Debug("[Lag Msg] no need to learn")
   } else {
     ballot := NewBallotNumber(msg.GetProposalID(), msg.GetProposalNodeID())
-    err := self.state.LearnValue(msg.GetInstanceID(), *ballot, msg.Value, self.GetLastChecksum())
+    err := self.state.LearnValue(msg.GetInstanceID(), *ballot, msg.GetValue(), self.GetLastChecksum())
     if err != nil {
       log.Error("LearnState.LearnValue fail:%v", err)
       return
@@ -311,7 +313,7 @@ func (self *Learner) OnSendLearnValue_Ack(msg *common.PaxosMsg) {
 }
 
 func (self *Learner) getSeenLatestInstanceId() uint64 {
-  return 0
+  return self.highestSeenInstanceID
 }
 
 func (self *Learner) ProposerSendSuccess(instanceId uint64, proposalId uint64) {
