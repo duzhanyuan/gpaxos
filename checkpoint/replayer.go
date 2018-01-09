@@ -31,8 +31,11 @@ func NewReplayer(config *config.Config, factory *statemachine.StatemachineFactor
 		ckmnger:mnger,
 	}
 
-	util.StartRoutine(replayer.main)
 	return replayer
+}
+
+func (self *Replayer) Start() {
+	util.StartRoutine(self.main)
 }
 
 func (self *Replayer) Stop() {
@@ -41,6 +44,15 @@ func (self *Replayer) Stop() {
 
 func (self *Replayer) Pause() {
 	self.canRun = false
+}
+
+func (self *Replayer) IsPaused() bool {
+	return self.isPaused
+}
+
+func (self *Replayer) Continue() {
+	self.isPaused = false
+	self.canRun = true
 }
 
 func (self *Replayer) main() {

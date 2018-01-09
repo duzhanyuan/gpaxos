@@ -23,6 +23,7 @@ var (
   ErrFileNotExist      = errors.New("file not exist")
   ErrDbNotInit         = errors.New("db not init yet")
   ErrNodeNotFound      = errors.New("node not found")
+	ErrWriteFileFail     = errors.New("write file fail")
 )
 
 // MsgCmd

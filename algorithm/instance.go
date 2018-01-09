@@ -15,6 +15,7 @@ import (
   "github.com/lichuang/gpaxos/statemachine"
   "sync"
   "fmt"
+	"github.com/lichuang/gpaxos/checkpoint"
 )
 
 const (
@@ -44,11 +45,13 @@ type Instance struct {
   paxosMsgChan chan *common.PaxosMsg
 
   retryMsgList *list.List
-  
+
+  ckMnger 	*checkpoint.CheckpointManager
+  lastChecksum uint32
   mutex sync.Mutex
 }
 
-func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instance {
+func NewInstance(config *config.Config, logStorage *storage.LogStorage, useCkReplayer bool) (*Instance, error) {
   instance := &Instance{
     config:       config,
     logStorage:   logStorage,
@@ -62,23 +65,54 @@ func NewInstance(config *config.Config, logStorage *storage.LogStorage) *Instanc
   }
   instance.initNetwork(config.GetOptions())
 
+	instance.acceptor = NewAcceptor(instance)
+
+  instance.ckMnger = checkpoint.NewCheckpointManager(config, instance.factory, logStorage, useCkReplayer)
+  instance.ckMnger.Init()
+	cpInstanceId := instance.ckMnger.GetCheckpointInstanceID() + 1
+
+	log.Info("acceptor OK, log.instanceid %d checkpoint.instanceid %d", instance.acceptor.GetInstanceId(), cpInstanceId)
+	nowInstanceId := cpInstanceId
+	if nowInstanceId < instance.acceptor.GetInstanceId() {
+		err := instance.PlayLog(nowInstanceId, instance.acceptor.GetInstanceId())
+		if err != nil {
+			return nil, err
+		}
+		nowInstanceId = instance.acceptor.GetInstanceId()
+	} else {
+		if nowInstanceId > instance.acceptor.GetInstanceId() {
+			instance.acceptor.InitForNewPaxosInstance(false)
+		}
+		instance.acceptor.setInstanceId(nowInstanceId)
+	}
+
+	log.Info("now instance id: %d", nowInstanceId)
+
   instance.commitctx = newCommitContext(instance)
   instance.committer = newCommitter(instance)
   // learner must create before proposer
-  instance.acceptor = NewAcceptor(instance)
   instance.learner = NewLearner(instance)
+
   instance.proposer = NewProposer(instance)
+	instance.proposer.setStartProposalID(instance.acceptor.GetAcceptorState().GetPromiseNum().proposalId + 1)
 
   instance.name = fmt.Sprintf("%s-%d", config.GetOptions().MyNode.String(), config.GetMyNodeId())
 
   maxInstanceId, err := logStorage.GetMaxInstanceID()
   log.Debug("max instance id:%d:%v， propose id:%d", maxInstanceId, err, instance.proposer.GetInstanceId())
 
+  instance.ckMnger.SetMinChosenInstanceID(nowInstanceId)
+  err = instance.InitLastCheckSum()
+  if err != nil {
+  	return nil, err
+	}
   instance.learner.Reset_AskforLearn_Noop(common.GetAskforLearnInterval())
+
+  instance.ckMnger.Start()
 
   util.StartRoutine(instance.main)
 
-  return instance
+  return instance, nil
 }
 
 func (self *Instance)initNetwork(options *gpaxos.Options) *Instance {
@@ -128,6 +162,60 @@ func (self *Instance) Status(instanceId uint64) (Status,[]byte) {
   }
 
   return Pending, nil
+}
+
+func (self *Instance) InitLastCheckSum() error {
+	acceptor := self.acceptor
+	ckMnger := self.ckMnger
+
+	if acceptor.GetInstanceId() == 0 {
+		self.lastChecksum = 0
+		return nil
+	}
+
+	if acceptor.GetInstanceId() <= ckMnger.GetMinChosenInstanceID() {
+		self.lastChecksum = 0
+		return nil
+	}
+
+	state, err := self.paxosLog.ReadState(acceptor.GetInstanceId() - 1)
+	if err != nil && err != common.ErrKeyNotFound {
+		return err
+	}
+
+	if err == common.ErrKeyNotFound {
+		log.Error("last checksum not exist, now instance id %d", self.acceptor.GetInstanceId())
+		self.lastChecksum = 0
+		return nil
+	}
+
+	self.lastChecksum = state.GetChecksum()
+	log.Info("OK, last checksum %d", self.lastChecksum)
+
+	return nil
+}
+
+func (self *Instance) PlayLog(beginInstanceId uint64, endInstanceId uint64) error {
+	if beginInstanceId < self.ckMnger.GetMinChosenInstanceID() {
+		log.Error("now instanceid %d small than chosen instanceid %d", beginInstanceId, self.ckMnger.GetMinChosenInstanceID())
+		return common.ErrInvalidInstanceId
+	}
+
+	for instanceId := beginInstanceId; instanceId < endInstanceId; instanceId++ {
+		state, err := self.paxosLog.ReadState(instanceId)
+		if err != nil {
+			log.Error("read instance %d log fail %v", instanceId, err)
+			return err
+		}
+
+		err = self.factory.Execute(instanceId, state.GetAcceptedValue(), nil)
+		if err != nil {
+			log.Error("execute instanceid %d fail:%v", instanceId, err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (self *Instance) NowInstanceId()uint64 {

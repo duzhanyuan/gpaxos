@@ -7,6 +7,9 @@ import (
   log "github.com/lichuang/log4go"
   "github.com/lichuang/gpaxos/util"
   "github.com/golang/protobuf/proto"
+	"github.com/lichuang/gpaxos/checkpoint"
+	"github.com/lichuang/gpaxos/statemachine"
+	"github.com/lichuang/gpaxos"
 )
 
 type Learner struct {
@@ -22,6 +25,10 @@ type Learner struct {
   askforlearnNoopTimerID           uint32
   sender                          *LearnerSender
   timerThread                     *util.TimerThread
+  ckReceiver 											*CheckpointReceiver
+  ckSender 												*CheckpointSender
+  ckMnger 												*checkpoint.CheckpointManager
+	factory 												*statemachine.StatemachineFactory
 }
 
 func NewLearner(instance *Instance) *Learner {
@@ -36,6 +43,9 @@ func NewLearner(instance *Instance) *Learner {
     state:                            NewLearnerState(instance),
     instance:                         instance,
     timerThread: 											instance.timerThread,
+    ckReceiver:												NewCheckpointReceiver(instance.config, instance.logStorage),
+		ckMnger: 													instance.ckMnger,
+		factory: 													instance.factory,
   }
   learner.sender = NewLearnerSender(instance, learner)
 
@@ -359,6 +369,145 @@ func (self *Learner) OnProposerSendSuccess(msg *common.PaxosMsg) {
 
   log.Info("learn value instanceid %d ok", msg.GetInstanceID())
   //self.TransmitToFollower()
+}
+
+func (self *Learner) SendCheckpointBegin(sendNodeId uint64, uuid uint64,
+																			 sequence uint64, ckInstanceId uint64) error {
+	ckMsg := &common.CheckpointMsg{
+		MsgType:      proto.Int32(common.CheckpointMsgType_SendFile),
+		NodeID:       proto.Uint64(self.config.GetMyNodeId()),
+		Flag:         proto.Int32(common.CheckpointSendFileFlag_BEGIN),
+		UUID:   			proto.Uint64(uuid),
+		Sequence:   	proto.Uint64(sequence),
+		CheckpointInstanceID: proto.Uint64(ckInstanceId),
+	}
+
+	return self.sendCheckpointMessage(sendNodeId, ckMsg)
+}
+
+func (self *Learner) SendCheckpointEnd(sendNodeId uint64, uuid uint64,
+	sequence uint64, ckInstanceId uint64) error {
+	ckMsg := &common.CheckpointMsg{
+		MsgType:      proto.Int32(common.CheckpointMsgType_SendFile),
+		NodeID:       proto.Uint64(self.config.GetMyNodeId()),
+		Flag:         proto.Int32(common.CheckpointSendFileFlag_END),
+		UUID:   			proto.Uint64(uuid),
+		Sequence:   	proto.Uint64(sequence),
+		CheckpointInstanceID: proto.Uint64(ckInstanceId),
+	}
+
+	return self.sendCheckpointMessage(sendNodeId, ckMsg)
+}
+
+func (self *Learner) SendCheckpoint(sendNodeId uint64, uuid uint64,
+																		sequence uint64, ckInstanceId uint64, ckssum uint32,
+																		filePath string, smid int32, offset uint64, buffer []byte) error {
+	ckMsg := &common.CheckpointMsg{
+		MsgType:      proto.Int32(common.CheckpointMsgType_SendFile),
+		NodeID:       proto.Uint64(self.config.GetMyNodeId()),
+		Flag:         proto.Int32(common.CheckpointSendFileFlag_ING),
+		UUID:   			proto.Uint64(uuid),
+		Sequence:   	proto.Uint64(sequence),
+		CheckpointInstanceID: proto.Uint64(ckInstanceId),
+		Checksum: 		proto.Uint32(ckssum),
+		FilePath:     proto.String(filePath),
+		SMID: 				proto.Int(int(smid)),
+		Offset: 			proto.Uint64(offset),
+		Buffer: 			buffer,
+	}
+
+	return self.sendCheckpointMessage(sendNodeId, ckMsg)
+}
+
+func (self *Learner) OnSendCheckpointBegin(ckMsg *common.CheckpointMsg) error {
+	err := self.ckReceiver.NewReceiver(ckMsg.GetNodeID(), ckMsg.GetUUID())
+	if err != nil {
+		return err
+	}
+
+	err = self.ckMnger.SetMinChosenInstanceID(ckMsg.GetCheckpointInstanceID())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (self *Learner) OnSendCheckpointIng(ckMsg *common.CheckpointMsg) error {
+	return self.ckReceiver.ReceiveCheckpoint(ckMsg)
+}
+
+func (self *Learner) OnSendCheckpointEnd(ckMsg *common.CheckpointMsg) error {
+	if !self.ckReceiver.IsReceiverFinish(ckMsg.GetNodeID(), ckMsg.GetUUID(), ckMsg.GetSequence()) {
+		log.Error("receive end msg but receiver not finish")
+		return common.ErrInvalidMsg
+	}
+
+	smList := self.factory.GetSMList()
+	for _, sm := range smList {
+		smid := sm.SMID()
+		if smid == gpaxos.SYSTEM_V_SMID || smid == gpaxos.MASTER_V_SMID {
+			continue
+		}
+
+		//tmpDirPath := self.ckReceiver.GetTmpDirPath(smid)
+
+	}
+
+	return nil
+}
+
+func (self *Learner) OnSendCheckpoint(ckMsg *common.CheckpointMsg) {
+	log.Info("start uuid %d flag %d sequence %d cpi %d checksum %d smid %d offset %d filepath %s",
+		ckMsg.GetUUID(), ckMsg.GetFlag(), ckMsg.GetSequence(), ckMsg.GetCheckpointInstanceID(),
+		ckMsg.GetChecksum(), ckMsg.GetSMID(), ckMsg.GetOffset(), ckMsg.GetFilePath())
+
+	var err error
+	switch ckMsg.GetFlag() {
+	case common.CheckpointSendFileFlag_BEGIN:
+		err = self.OnSendCheckpointBegin(ckMsg)
+		break
+	case common.CheckpointSendFileFlag_ING:
+		err = self.OnSendCheckpointIng(ckMsg)
+		break
+	case common.CheckpointSendFileFlag_END:
+		err = self.OnSendCheckpointEnd(ckMsg)
+		break
+	}
+
+	if err != nil {
+		log.Error("[FATAL]rest checkpoint receiver and reset askforlearn")
+		self.ckReceiver.Reset()
+		self.Reset_AskforLearn_Noop(5000)
+		self.SendCheckpointAck(ckMsg.GetNodeID(), ckMsg.GetUUID(), ckMsg.GetSequence(), common.CheckpointSendFileAckFlag_Fail)
+	} else {
+		self.SendCheckpointAck(ckMsg.GetNodeID(), ckMsg.GetUUID(), ckMsg.GetSequence(), common.CheckpointSendFileAckFlag_OK)
+		self.Reset_AskforLearn_Noop(10000)
+	}
+}
+
+func (self *Learner) SendCheckpointAck(sendNodeId uint64, uuid uint64, sequence uint64, flag int) error {
+	ckMsg := &common.CheckpointMsg{
+		MsgType:      proto.Int32(common.CheckpointMsgType_SendFile_Ack),
+		NodeID:       proto.Uint64(self.config.GetMyNodeId()),
+		UUID:   			proto.Uint64(uuid),
+		Sequence:   	proto.Uint64(sequence),
+		Flag:         proto.Int32(common.CheckpointSendFileFlag_ING),
+	}
+
+	return self.sendCheckpointMessage(sendNodeId, ckMsg)
+}
+
+func (self *Learner) OnSendCheckpointAck(ckMsg *common.CheckpointMsg) {
+	log.Info("START flag %d", ckMsg.GetFlag())
+
+	if self.ckSender != nil && !self.ckSender.IsEnd() {
+		if ckMsg.GetFlag() == common.CheckpointSendFileAckFlag_OK {
+			self.ckSender.Ack(ckMsg.GetNodeID(), ckMsg.GetUUID(), ckMsg.GetSequence())
+		} else {
+			self.ckSender.End()
+		}
+	}
 }
 
 /*

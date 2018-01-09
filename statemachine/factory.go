@@ -155,3 +155,7 @@ func (self *StatemachineFactory) DoExecuteForCheckpoint(instanceId uint64, body 
 
 	return sm.ExecuteForCheckpoint(instanceId, body)
 }
+
+func (self *StatemachineFactory) GetSMList() map[int32] gpaxos.StateMachine {
+	return self.stateMachines
+}

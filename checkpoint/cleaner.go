@@ -40,8 +40,11 @@ func NewCleaner(config *config.Config, factory *statemachine.StatemachineFactory
 		holdCount: 100000,
 	}
 
-	util.StartRoutine(cleaner.main)
 	return cleaner
+}
+
+func (self *Cleaner) Start() {
+	util.StartRoutine(self.main)
 }
 
 func (self *Cleaner) Stop() {

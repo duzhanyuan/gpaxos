@@ -55,11 +55,22 @@ func (self *CheckpointManager) Init() error {
 	return nil
 }
 
+func (self *CheckpointManager) Start() {
+	self.cleaner.Start()
+	if self.useCheckpointReplayer {
+		self.replayer.Start()
+	}
+}
+
 func (self *CheckpointManager) Stop() {
 	if self.useCheckpointReplayer {
 		self.replayer.Stop()
 	}
 	self.cleaner.Stop()
+}
+
+func (self *CheckpointManager) GetRelayer() *Replayer {
+	return self.replayer
 }
 
 func (self *CheckpointManager) PrepareForAskforCheckpoint(sendNodeId uint64) error {
@@ -91,6 +102,10 @@ func (self *CheckpointManager) GetMaxChosenInstanceID() uint64 {
 	return self.maxChosenInstanceId
 }
 
+func (self *CheckpointManager) SetMaxChosenInstanceID(instanceId uint64) {
+	self.maxChosenInstanceId = instanceId
+}
+
 func (self *CheckpointManager) SetMinChosenInstanceID(instanceId uint64) error {
 	/*
 	options := storage.WriteOptions{
@@ -104,4 +119,8 @@ func (self *CheckpointManager) SetMinChosenInstanceID(instanceId uint64) error {
 
 	self.minChosenInstanceId = instanceId
 	return nil
+}
+
+func (self *CheckpointManager) GetCheckpointInstanceID() uint64 {
+	return self.factory.GetCheckpointInstanceID()
 }

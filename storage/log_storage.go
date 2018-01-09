@@ -49,6 +49,10 @@ type LogStorage struct {
   leveldb    *leveldb.DB
 }
 
+func (self *LogStorage) GetLogStorageDirPath() string {
+	return self.GetDBPath()
+}
+
 func (self *LogStorage) ClearAllLog() error {
   sysVarbuffer, err := self.GetSystemVariables()
   if err != nil && err != common.ErrKeyNotFound {
